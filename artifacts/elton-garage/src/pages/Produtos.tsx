@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-  useListProducts, useCreateProduct, getListProductsQueryKey 
+  useListProducts, useCreateProduct, useDeleteProduct, getListProductsQueryKey 
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils';
@@ -10,7 +10,8 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
-import { Search, Plus, Package, Loader2, AlertTriangle } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
+import { Search, Plus, Package, Loader2, AlertTriangle, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -37,6 +38,7 @@ export default function Produtos() {
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [showLowStock, setShowLowStock] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -49,6 +51,7 @@ export default function Produtos() {
   });
 
   const createMutation = useCreateProduct();
+  const deleteMutation = useDeleteProduct();
 
   const form = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
@@ -67,6 +70,22 @@ export default function Produtos() {
       },
       onError: () => {
         toast({ title: 'Erro ao cadastrar produto', variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleDelete = () => {
+    if (confirmDeleteId == null) return;
+    deleteMutation.mutate({ id: confirmDeleteId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+        toast({ title: 'Registro excluído com sucesso.' });
+        setConfirmDeleteId(null);
+      },
+      onError: (error: any) => {
+        const message = error?.data?.message || 'Erro ao excluir produto.';
+        toast({ title: message, variant: 'destructive' });
+        setConfirmDeleteId(null);
       }
     });
   };
@@ -148,10 +167,11 @@ export default function Produtos() {
       <Card className="border-border">
         <div className="rounded-md overflow-hidden">
           <div className="bg-muted/50 grid grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
-            <div className="col-span-5 md:col-span-4">Produto</div>
+            <div className="col-span-4 md:col-span-3">Produto</div>
             <div className="col-span-3 hidden md:block">Marca/Fornecedor</div>
             <div className="col-span-3 text-right">Estoque</div>
-            <div className="col-span-4 md:col-span-2 text-right">Preço Venda</div>
+            <div className="col-span-3 md:col-span-2 text-right">Preço Venda</div>
+            <div className="col-span-2 md:col-span-1"></div>
           </div>
           
           <div className="divide-y divide-border">
@@ -161,8 +181,8 @@ export default function Produtos() {
               <div className="p-8 text-center text-muted-foreground">Nenhum produto encontrado.</div>
             ) : (
               data?.data.map((product) => (
-                <div key={product.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors">
-                  <div className="col-span-5 md:col-span-4 flex items-center gap-3">
+                <div key={product.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors group">
+                  <div className="col-span-4 md:col-span-3 flex items-center gap-3">
                     <div className={`p-2 rounded bg-secondary ${product.isLowStock ? 'bg-red-500/10 text-red-500' : 'text-muted-foreground'}`}>
                       <Package className="w-4 h-4" />
                     </div>
@@ -188,8 +208,18 @@ export default function Produtos() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">Min: {product.minimumStock}</p>
                   </div>
-                  <div className="col-span-4 md:col-span-2 text-right font-medium">
+                  <div className="col-span-3 md:col-span-2 text-right font-medium">
                     {product.salePrice ? formatCurrency(product.salePrice) : '-'}
+                  </div>
+                  <div className="col-span-2 md:col-span-1 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setConfirmDeleteId(product.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               ))
@@ -205,6 +235,13 @@ export default function Produtos() {
           <Button variant="outline" disabled={page >= data.meta.totalPages} onClick={() => setPage(p => p + 1)}>Próxima</Button>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}
+        onConfirm={handleDelete}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

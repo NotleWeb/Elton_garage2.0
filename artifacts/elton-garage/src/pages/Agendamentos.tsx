@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import { 
   useListAppointments, useCreateAppointment, getListAppointmentsQueryKey,
-  useListCustomers, useListServices, useListCustomerVehicles, useUpdateAppointmentStatus
+  useListCustomers, useListServices, useListCustomerVehicles, useUpdateAppointmentStatus,
+  useDeleteAppointment
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -12,7 +13,8 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Calendar, Loader2, ChevronRight, Check, X, Clock } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
+import { Search, Plus, Calendar, Loader2, ChevronRight, Check, Trash2, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -60,6 +62,7 @@ export default function Agendamentos() {
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -73,12 +76,12 @@ export default function Agendamentos() {
 
   const { data: customers } = useListCustomers({ limit: 100 });
   const { data: services } = useListServices({ limit: 100, active: true });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: vehiclesResponse } = useListCustomerVehicles(selectedCustomerId || 0, { query: { enabled: !!selectedCustomerId } as any });
   const vehicles = (vehiclesResponse as any[]) || [];
 
   const createMutation = useCreateAppointment();
   const statusMutation = useUpdateAppointmentStatus();
+  const deleteMutation = useDeleteAppointment();
 
   const form = useForm<AppointmentForm>({
     resolver: zodResolver(appointmentSchema),
@@ -88,10 +91,8 @@ export default function Agendamentos() {
   });
 
   const onSubmit = (values: AppointmentForm) => {
-    // Add :00 for seconds if not present
     let dateStr = values.appointmentDate;
     if (dateStr.length === 16) dateStr += ':00';
-    
     createMutation.mutate({ data: { ...values, appointmentDate: new Date(dateStr).toISOString() } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
@@ -111,6 +112,22 @@ export default function Agendamentos() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
         toast({ title: 'Status atualizado com sucesso' });
+      }
+    });
+  };
+
+  const handleDelete = () => {
+    if (confirmDeleteId == null) return;
+    deleteMutation.mutate({ id: confirmDeleteId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
+        toast({ title: 'Registro excluído com sucesso.' });
+        setConfirmDeleteId(null);
+      },
+      onError: (error: any) => {
+        const message = error?.data?.message || 'Erro ao excluir agendamento.';
+        toast({ title: message, variant: 'destructive' });
+        setConfirmDeleteId(null);
       }
     });
   };
@@ -161,7 +178,7 @@ export default function Agendamentos() {
                       <Select onValueChange={(v) => {
                         field.onChange(parseInt(v));
                         setSelectedCustomerId(parseInt(v));
-                        form.setValue('vehicleId', 0); // reset vehicle
+                        form.setValue('vehicleId', 0);
                       }} value={field.value ? String(field.value) : undefined}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecione um cliente" /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -236,7 +253,7 @@ export default function Agendamentos() {
             <div className="col-span-3">Cliente / Veículo</div>
             <div className="col-span-3 hidden md:block">Serviço</div>
             <div className="col-span-2 text-center">Status</div>
-            <div className="col-span-1 text-right"></div>
+            <div className="col-span-1"></div>
           </div>
           
           <div className="divide-y divide-border">
@@ -286,8 +303,16 @@ export default function Agendamentos() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <div className="col-span-1 text-right flex justify-end">
-                    <Button variant="ghost" size="icon" asChild className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="col-span-1 text-right flex justify-end items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setConfirmDeleteId(apt.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" asChild className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8">
                       <Link href={`/agendamentos/${apt.id}`}>
                         <ChevronRight className="w-5 h-5 text-muted-foreground" />
                       </Link>
@@ -307,6 +332,13 @@ export default function Agendamentos() {
           <Button variant="outline" disabled={page >= data.meta.totalPages} onClick={() => setPage(p => p + 1)}>Próxima</Button>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}
+        onConfirm={handleDelete}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

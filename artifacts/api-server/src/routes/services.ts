@@ -48,7 +48,15 @@ router.put("/:id", (req, res) => {
 
 router.delete("/:id", (req, res) => {
   const id = Number(req.params.id);
-  if (!db.prepare("SELECT * FROM services WHERE id = ?").get(id)) { res.status(404).json({ error: "not_found", message: "Serviço não encontrado" }); return; }
+  if (!db.prepare("SELECT id FROM services WHERE id = ?").get(id)) {
+    res.status(404).json({ error: "not_found", message: "Serviço não encontrado" });
+    return;
+  }
+  const linked = db.prepare("SELECT id FROM appointments WHERE service_id = ? LIMIT 1").get(id);
+  if (linked) {
+    res.status(409).json({ error: "conflict", message: "Serviço está vinculado a agendamentos existentes e não pode ser excluído." });
+    return;
+  }
   db.prepare("DELETE FROM services WHERE id = ?").run(id);
   res.json({ message: "Serviço removido com sucesso" });
 });

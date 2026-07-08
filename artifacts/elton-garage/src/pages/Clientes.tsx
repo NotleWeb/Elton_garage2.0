@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
-import { useListCustomers, useCreateCustomer, getListCustomersQueryKey } from '@workspace/api-client-react';
+import { useListCustomers, useCreateCustomer, useDeleteCustomer, getListCustomersQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Search, Plus, User as UserIcon, Loader2, ChevronRight, Phone } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
+import { Search, Plus, Loader2, ChevronRight, Phone, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -32,6 +33,7 @@ export default function Clientes() {
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -45,6 +47,7 @@ export default function Clientes() {
   });
 
   const createMutation = useCreateCustomer();
+  const deleteMutation = useDeleteCustomer();
 
   const form = useForm<CustomerForm>({
     resolver: zodResolver(customerSchema),
@@ -63,6 +66,22 @@ export default function Clientes() {
       },
       onError: () => {
         toast({ title: 'Erro ao cadastrar cliente', variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleDelete = () => {
+    if (confirmDeleteId == null) return;
+    deleteMutation.mutate({ id: confirmDeleteId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+        toast({ title: 'Registro excluído com sucesso.' });
+        setConfirmDeleteId(null);
+      },
+      onError: (error: any) => {
+        const message = error?.data?.message || 'Erro ao excluir cliente.';
+        toast({ title: message, variant: 'destructive' });
+        setConfirmDeleteId(null);
       }
     });
   };
@@ -144,40 +163,66 @@ export default function Clientes() {
               <div className="p-8 text-center text-muted-foreground">Nenhum cliente encontrado.</div>
             ) : (
               data?.data.map((customer) => (
-                <Link key={customer.id} href={`/clientes/${customer.id}`}>
-                  <div className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/50 transition-colors cursor-pointer group">
-                    <div className="col-span-11 md:col-span-5 flex items-center gap-3">
-                      <Avatar className="h-9 w-9 border border-border">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {customer.name.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="overflow-hidden">
-                        <p className="font-medium truncate text-foreground group-hover:text-primary transition-colors">
-                          {customer.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">{customer.totalServices} serviços realizados</p>
-                      </div>
-                    </div>
-                    <div className="col-span-2 hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-                      {(customer.whatsapp || customer.phone) ? (
-                        <>
-                          <Phone className="w-3 h-3" />
-                          <span className="truncate">{customer.whatsapp || customer.phone}</span>
-                        </>
-                      ) : '-'}
-                    </div>
-                    <div className="col-span-2 text-right font-medium">
-                      {formatCurrency(customer.totalSpent || 0)}
-                    </div>
-                    <div className="col-span-2 text-right hidden lg:block text-sm text-muted-foreground">
-                      {customer.lastServiceDate ? formatDate(customer.lastServiceDate) : '-'}
-                    </div>
-                    <div className="col-span-1 text-right flex justify-end">
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                <div key={customer.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/50 transition-colors group">
+                  {/* Clickable content area */}
+                  <div
+                    className="col-span-10 md:col-span-5 flex items-center gap-3 cursor-pointer"
+                    onClick={() => setLocation(`/clientes/${customer.id}`)}
+                  >
+                    <Avatar className="h-9 w-9 border border-border shrink-0">
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        {customer.name.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="overflow-hidden">
+                      <p className="font-medium truncate text-foreground group-hover:text-primary transition-colors">
+                        {customer.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{customer.totalServices} serviços realizados</p>
                     </div>
                   </div>
-                </Link>
+                  <div
+                    className="col-span-2 hidden md:flex items-center gap-2 text-sm text-muted-foreground cursor-pointer"
+                    onClick={() => setLocation(`/clientes/${customer.id}`)}
+                  >
+                    {(customer.whatsapp || customer.phone) ? (
+                      <>
+                        <Phone className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{customer.whatsapp || customer.phone}</span>
+                      </>
+                    ) : '-'}
+                  </div>
+                  <div
+                    className="col-span-2 text-right font-medium cursor-pointer"
+                    onClick={() => setLocation(`/clientes/${customer.id}`)}
+                  >
+                    {formatCurrency(customer.totalSpent || 0)}
+                  </div>
+                  <div
+                    className="col-span-2 text-right hidden lg:block text-sm text-muted-foreground cursor-pointer"
+                    onClick={() => setLocation(`/clientes/${customer.id}`)}
+                  >
+                    {customer.lastServiceDate ? formatDate(customer.lastServiceDate) : '-'}
+                  </div>
+                  <div className="col-span-2 md:col-span-1 text-right flex justify-end items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setConfirmDeleteId(customer.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                      onClick={() => setLocation(`/clientes/${customer.id}`)}
+                    >
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </div>
               ))
             )}
           </div>
@@ -186,25 +231,18 @@ export default function Clientes() {
       
       {data?.meta && data.meta.totalPages > 1 && (
         <div className="flex justify-center gap-2">
-          <Button 
-            variant="outline" 
-            disabled={page === 1} 
-            onClick={() => setPage(p => p - 1)}
-          >
-            Anterior
-          </Button>
-          <div className="flex items-center px-4 text-sm font-medium">
-            Página {page} de {data.meta.totalPages}
-          </div>
-          <Button 
-            variant="outline" 
-            disabled={page >= data.meta.totalPages} 
-            onClick={() => setPage(p => p + 1)}
-          >
-            Próxima
-          </Button>
+          <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+          <div className="flex items-center px-4 text-sm font-medium">Página {page} de {data.meta.totalPages}</div>
+          <Button variant="outline" disabled={page >= data.meta.totalPages} onClick={() => setPage(p => p + 1)}>Próxima</Button>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}
+        onConfirm={handleDelete}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

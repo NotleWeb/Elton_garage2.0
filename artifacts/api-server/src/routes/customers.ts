@@ -58,9 +58,22 @@ router.put("/:id", (req, res) => {
 
 router.delete("/:id", (req, res) => {
   const id = Number(req.params.id);
-  const customer = db.prepare("SELECT * FROM customers WHERE id = ?").get(id);
-  if (!customer) { res.status(404).json({ error: "not_found", message: "Cliente não encontrado" }); return; }
-  db.prepare("DELETE FROM customers WHERE id = ?").run(id);
+  if (!db.prepare("SELECT id FROM customers WHERE id = ?").get(id)) {
+    res.status(404).json({ error: "not_found", message: "Cliente não encontrado" });
+    return;
+  }
+  const linked = db.prepare("SELECT id FROM appointments WHERE customer_id = ? LIMIT 1").get(id);
+  if (linked) {
+    res.status(409).json({ error: "conflict", message: "Cliente possui agendamentos vinculados. Remova os agendamentos antes de excluir o cliente." });
+    return;
+  }
+  const deleteCustomer = db.transaction(() => {
+    db.prepare("DELETE FROM notifications WHERE customer_id = ?").run(id);
+    db.prepare("DELETE FROM feedback WHERE customer_id = ?").run(id);
+    // vehicles and loyalty_cards are ON DELETE CASCADE on customer_id
+    db.prepare("DELETE FROM customers WHERE id = ?").run(id);
+  });
+  deleteCustomer();
   res.json({ message: "Cliente removido com sucesso" });
 });
 

@@ -100,8 +100,19 @@ router.patch("/:id/status", (req, res) => {
 
 router.delete("/:id", (req, res) => {
   const id = Number(req.params.id);
-  if (!db.prepare("SELECT * FROM appointments WHERE id = ?").get(id)) { res.status(404).json({ error: "not_found", message: "Agendamento não encontrado" }); return; }
-  db.prepare("DELETE FROM appointments WHERE id = ?").run(id);
+  if (!db.prepare("SELECT id FROM appointments WHERE id = ?").get(id)) {
+    res.status(404).json({ error: "not_found", message: "Agendamento não encontrado" });
+    return;
+  }
+  // Delete related records not covered by CASCADE before removing the appointment
+  const deleteRelated = db.transaction(() => {
+    db.prepare("DELETE FROM financial_transactions WHERE appointment_id = ?").run(id);
+    db.prepare("DELETE FROM inventory_movements WHERE appointment_id = ?").run(id);
+    db.prepare("DELETE FROM feedback WHERE appointment_id = ?").run(id);
+    // order_services and product_usage are ON DELETE CASCADE on appointment_id
+    db.prepare("DELETE FROM appointments WHERE id = ?").run(id);
+  });
+  deleteRelated();
   res.json({ message: "Agendamento removido com sucesso" });
 });
 

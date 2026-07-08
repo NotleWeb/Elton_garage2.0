@@ -47,7 +47,20 @@ router.put("/:id", (req, res) => {
 
 router.delete("/:id", (req, res) => {
   const id = Number(req.params.id);
-  if (!db.prepare("SELECT * FROM products WHERE id = ?").get(id)) { res.status(404).json({ error: "not_found", message: "Produto não encontrado" }); return; }
+  if (!db.prepare("SELECT id FROM products WHERE id = ?").get(id)) {
+    res.status(404).json({ error: "not_found", message: "Produto não encontrado" });
+    return;
+  }
+  const hasUsage = db.prepare("SELECT id FROM product_usage WHERE product_id = ? LIMIT 1").get(id);
+  if (hasUsage) {
+    res.status(409).json({ error: "conflict", message: "Produto possui histórico de uso em agendamentos e não pode ser excluído." });
+    return;
+  }
+  const hasMovements = db.prepare("SELECT id FROM inventory_movements WHERE product_id = ? LIMIT 1").get(id);
+  if (hasMovements) {
+    res.status(409).json({ error: "conflict", message: "Produto possui movimentações de estoque registradas e não pode ser excluído." });
+    return;
+  }
   db.prepare("DELETE FROM products WHERE id = ?").run(id);
   res.json({ message: "Produto removido com sucesso" });
 });

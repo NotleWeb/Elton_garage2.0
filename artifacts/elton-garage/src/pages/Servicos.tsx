@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-  useListServices, useCreateService, useUpdateService, getListServicesQueryKey 
+  useListServices, useCreateService, useDeleteService, getListServicesQueryKey 
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils';
@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Search, Plus, Wrench, Loader2, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
+import { Search, Plus, Wrench, Loader2, Clock, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -36,6 +37,7 @@ export default function Servicos() {
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -46,6 +48,7 @@ export default function Servicos() {
   });
 
   const createMutation = useCreateService();
+  const deleteMutation = useDeleteService();
 
   const form = useForm<ServiceForm>({
     resolver: zodResolver(serviceSchema),
@@ -64,6 +67,22 @@ export default function Servicos() {
       },
       onError: () => {
         toast({ title: 'Erro ao cadastrar serviço', variant: 'destructive' });
+      }
+    });
+  };
+
+  const handleDelete = () => {
+    if (confirmDeleteId == null) return;
+    deleteMutation.mutate({ id: confirmDeleteId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListServicesQueryKey() });
+        toast({ title: 'Registro excluído com sucesso.' });
+        setConfirmDeleteId(null);
+      },
+      onError: (error: any) => {
+        const message = error?.data?.message || 'Erro ao excluir serviço.';
+        toast({ title: message, variant: 'destructive' });
+        setConfirmDeleteId(null);
       }
     });
   };
@@ -183,15 +202,15 @@ export default function Servicos() {
           </div>
         ) : (
           data?.data.map((service) => (
-            <Card key={service.id} className={`border-border transition-colors ${!service.active ? 'opacity-60 grayscale-[0.5]' : 'hover:border-primary/50'}`}>
+            <Card key={service.id} className={`border-border transition-colors group ${!service.active ? 'opacity-60 grayscale-[0.5]' : 'hover:border-primary/50'}`}>
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="bg-primary/10 p-2.5 rounded-lg text-primary">
                     <Wrench className="w-6 h-6" />
                   </div>
-                  <div className="flex flex-col items-end">
+                  <div className="flex flex-col items-end gap-1">
                     <span className="text-xl font-bold text-primary">{formatCurrency(service.price)}</span>
-                    <Badge variant={service.active ? "outline" : "secondary"} className={service.active ? "bg-emerald-500/10 text-emerald-500 border-none mt-1" : "mt-1"}>
+                    <Badge variant={service.active ? "outline" : "secondary"} className={service.active ? "bg-emerald-500/10 text-emerald-500 border-none" : ""}>
                       {service.active ? 'Ativo' : 'Inativo'}
                     </Badge>
                   </div>
@@ -208,19 +227,38 @@ export default function Servicos() {
                     <span className="font-medium text-foreground">{formatDuration(service.estimatedDuration)}</span>
                   </div>
                   <div className="flex flex-col gap-1 text-muted-foreground">
-                    <span className="flex items-center gap-1">Categoria</span>
+                    <span>Categoria</span>
                     <span className="font-medium text-foreground">{service.category || '-'}</span>
                   </div>
                   <div className="flex flex-col gap-1 text-muted-foreground">
-                    <span className="flex items-center gap-1">Veículo</span>
+                    <span>Veículo</span>
                     <span className="font-medium text-foreground capitalize">{service.vehicleType}</span>
                   </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-border flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 px-2"
+                    onClick={() => setConfirmDeleteId(service.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                    Excluir
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))
         )}
       </div>
+
+      <ConfirmDeleteDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}
+        onConfirm={handleDelete}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }
