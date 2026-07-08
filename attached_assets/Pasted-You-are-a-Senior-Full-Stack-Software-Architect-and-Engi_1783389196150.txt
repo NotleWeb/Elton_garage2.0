@@ -1,0 +1,643 @@
+You are a Senior Full Stack Software Architect and Engineer.
+
+Your task is to build a COMPLETE production-ready web application for an automotive detailing business called "Elton Garage".
+
+IMPORTANT:
+This is NOT a prototype.
+This is NOT a demo.
+This is NOT a CRUD tutorial.
+
+Generate a real commercial-quality application.
+
+===========================================================
+GENERAL REQUIREMENTS
+===========================================================
+
+Frontend language:
+Portuguese (Brazil - pt-BR)
+
+Source code:
+English
+
+Variable names:
+English
+
+Comments:
+English
+
+Database:
+SQLite
+
+Architecture:
+Clean Architecture
+
+REST API
+
+Responsive Design
+
+Dark Theme
+
+Modern UI
+
+Reusable Components
+
+Scalable Code
+
+Production Ready
+
+===========================================================
+TECH STACK
+===========================================================
+
+Backend
+
+- Python 3.13+
+- FastAPI
+- SQLAlchemy 2
+- Alembic
+- Pydantic
+- Uvicorn
+
+Frontend
+
+- React
+- Vite
+- TailwindCSS
+- React Router
+- Axios
+- React Hook Form
+- Recharts
+- Lucide React
+
+Database
+
+SQLite
+
+Authentication
+
+JWT
+
+Password Hash
+
+bcrypt
+
+===========================================================
+PROJECT STRUCTURE
+===========================================================
+
+Generate the complete folder structure.
+
+Example:
+
+backend/
+
+app/
+
+api/
+
+models/
+
+schemas/
+
+services/
+
+repositories/
+
+database/
+
+core/
+
+utils/
+
+middleware/
+
+routers/
+
+main.py
+
+frontend/
+
+src/
+
+pages/
+
+components/
+
+layouts/
+
+hooks/
+
+contexts/
+
+services/
+
+styles/
+
+App.jsx
+
+===========================================================
+DATABASE
+===========================================================
+
+Create every table with relationships.
+
+Use SQLAlchemy ORM.
+
+Generate:
+
+Models
+
+Schemas
+
+Repositories
+
+Services
+
+CRUD
+
+Relationships
+
+Indexes
+
+Constraints
+
+===========================================================
+DATABASE TABLES
+===========================================================
+
+Users
+
+Customers
+
+Vehicles
+
+Services
+
+Appointments
+
+OrderServices
+
+Products
+
+ProductUsage
+
+InventoryMovements
+
+FinancialTransactions
+
+Notifications
+
+Feedback
+
+LoyaltyCards
+
+Settings
+
+===========================================================
+CUSTOMERS
+===========================================================
+
+Fields
+
+id
+
+name
+
+phone
+
+whatsapp
+
+email
+
+address
+
+notes
+
+created_at
+
+updated_at
+
+total_spent
+
+total_services
+
+last_service_date
+
+===========================================================
+VEHICLES
+===========================================================
+
+One customer may have multiple vehicles.
+
+Fields
+
+id
+
+customer_id
+
+brand
+
+model
+
+year
+
+plate
+
+color
+
+fuel
+
+mileage
+
+notes
+
+===========================================================
+SERVICES
+===========================================================
+
+Fields
+
+id
+
+name
+
+description
+
+price
+
+estimated_duration
+
+category
+
+vehicle_type
+
+active
+
+===========================================================
+APPOINTMENTS
+===========================================================
+
+Fields
+
+id
+
+customer_id
+
+vehicle_id
+
+service_id
+
+appointment_date
+
+status
+
+discount
+
+final_price
+
+observations
+
+created_at
+
+===========================================================
+Statuses
+
+Agendado
+
+Confirmado
+
+Em andamento
+
+Concluído
+
+Cancelado
+
+===========================================================
+ORDER SERVICE
+===========================================================
+
+Fields
+
+id
+
+appointment_id
+
+before_photos
+
+after_photos
+
+checklist
+
+observations
+
+payment_method
+
+technician
+
+signature
+
+===========================================================
+PRODUCTS
+===========================================================
+
+Fields
+
+id
+
+name
+
+brand
+
+supplier
+
+purchase_price
+
+sale_price
+
+stock
+
+minimum_stock
+
+unit
+
+===========================================================
+PRODUCT USAGE
+===========================================================
+
+Store every product consumed during each service.
+
+===========================================================
+FINANCIAL
+===========================================================
+
+Income
+
+Expense
+
+Profit
+
+Cash Flow
+
+Monthly Reports
+
+===========================================================
+LOYALTY
+===========================================================
+
+Every completed wash increases customer loyalty.
+
+Rule:
+
+10 washes
+
+↓
+
+1 free wash
+
+Automatically calculate.
+
+===========================================================
+NOTIFICATIONS
+===========================================================
+
+Automatic reminders
+
+1 day
+
+15 days
+
+30 days
+
+45 days
+
+===========================================================
+BACKEND
+===========================================================
+
+Implement
+
+Authentication
+
+JWT
+
+Login
+
+Logout
+
+Protected Routes
+
+Validation
+
+Pagination
+
+Search
+
+Filtering
+
+Sorting
+
+Global Exception Handler
+
+Logging
+
+CORS
+
+Middleware
+
+Dependency Injection
+
+===========================================================
+REST API
+===========================================================
+
+Generate complete endpoints.
+
+Example:
+
+POST /login
+
+POST /customers
+
+GET /customers
+
+GET /customers/{id}
+
+PUT /customers/{id}
+
+DELETE /customers/{id}
+
+Same for
+
+Vehicles
+
+Services
+
+Appointments
+
+Orders
+
+Products
+
+Inventory
+
+Financial
+
+Notifications
+
+Reports
+
+===========================================================
+BUSINESS RULES
+===========================================================
+
+Completing an appointment:
+
+↓
+
+Automatically
+
+Generate revenue
+
+Update customer history
+
+Increase loyalty points
+
+Decrease product stock
+
+Register inventory movement
+
+Generate financial transaction
+
+Update dashboard KPIs
+
+===========================================================
+DASHBOARD API
+===========================================================
+
+Generate endpoints returning
+
+Monthly revenue
+
+Monthly profit
+
+Average ticket
+
+Appointments
+
+Vehicles serviced
+
+Hours worked
+
+Most sold services
+
+Top customers
+
+Revenue by day
+
+Revenue by month
+
+Upcoming reminders
+
+Customers needing maintenance
+
+===========================================================
+SECURITY
+===========================================================
+
+Hash passwords
+
+JWT
+
+Environment Variables
+
+Secrets
+
+Input Validation
+
+SQL Injection Protection
+
+XSS Protection
+
+CORS
+
+===========================================================
+DATABASE MIGRATIONS
+===========================================================
+
+Configure Alembic.
+
+Generate initial migration.
+
+===========================================================
+BACKUP
+===========================================================
+
+Implement API endpoints
+
+Export SQLite database
+
+Restore database
+
+===========================================================
+DOCUMENTATION
+===========================================================
+
+Generate
+
+README
+
+Installation Guide
+
+Requirements
+
+Run Instructions
+
+Database Migration Guide
+
+Project Architecture
+
+===========================================================
+QUALITY
+===========================================================
+
+Write clean code.
+
+Follow SOLID.
+
+Use Type Hints.
+
+Use Pydantic validation.
+
+Avoid duplicated code.
+
+Separate business logic from routes.
+
+Repositories cannot contain business logic.
+
+Services contain all business rules.
+
+===========================================================
+IMPORTANT
+===========================================================
+
+Do NOT generate placeholders.
+
+Do NOT generate TODO comments.
+
+Do NOT skip features.
+
+Every endpoint must be fully functional.
+
+Every CRUD must be complete.
+
+The application must be production-ready.
+
+===========================================================
+FINAL GOAL
+===========================================================
+
+Create a complete commercial ERP for automotive detailing companies.
+
+The application must be scalable, modern, maintainable and ready for future migration from SQLite to PostgreSQL without changing business logic.
+
+Every text displayed in the interface MUST be written in Brazilian Portuguese (pt-BR).

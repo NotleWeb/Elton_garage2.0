@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Elton Garage"
+version = "1.0.0"
+id = "artifacts/elton-garage"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19807
+
+[services.development]
+run = "pnpm --filter @workspace/elton-garage run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/elton-garage", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/elton-garage/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19807"
+BASE_PATH = "/"

@@ -3,20 +3,54 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Elton Garage ERP API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: customers
+    description: Customer management
+  - name: vehicles
+    description: Vehicle management
+  - name: services
+    description: Service catalog
+  - name: appointments
+    description: Appointment scheduling
+  - name: order-services
+    description: Order of service
+  - name: products
+    description: Product/inventory management
+  - name: product-usage
+    description: Product usage per service
+  - name: inventory
+    description: Inventory movements
+  - name: financial
+    description: Financial transactions
+  - name: notifications
+    description: Notification management
+  - name: feedback
+    description: Customer feedback
+  - name: loyalty
+    description: Loyalty card management
+  - name: dashboard
+    description: Dashboard KPIs and analytics
+  - name: reports
+    description: Reports
+  - name: backup
+    description: Backup and restore
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +58,2605 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── AUTH ──────────────────────────────────────────────
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ── USERS ─────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── CUSTOMERS ─────────────────────────────────────────
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List customers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, totalSpent, totalServices, lastServiceDate, createdAt]
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerListResponse"
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Create customer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get customer by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerDetail"
+    put:
+      operationId: updateCustomer
+      tags: [customers]
+      summary: Update customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomerRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+    delete:
+      operationId: deleteCustomer
+      tags: [customers]
+      summary: Delete customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /customers/{id}/vehicles:
+    get:
+      operationId: listCustomerVehicles
+      tags: [customers]
+      summary: List vehicles for a customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+
+  /customers/{id}/appointments:
+    get:
+      operationId: listCustomerAppointments
+      tags: [customers]
+      summary: List appointments for a customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentListResponse"
+
+  /customers/{id}/loyalty:
+    get:
+      operationId: getCustomerLoyalty
+      tags: [customers]
+      summary: Get loyalty card for a customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyCard"
+
+  # ── VEHICLES ──────────────────────────────────────────
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [vehicles]
+      summary: List all vehicles
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleListResponse"
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      summary: Create vehicle
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVehicleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /vehicles/{id}:
+    get:
+      operationId: getVehicle
+      tags: [vehicles]
+      summary: Get vehicle by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    put:
+      operationId: updateVehicle
+      tags: [vehicles]
+      summary: Update vehicle
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVehicleRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      summary: Delete vehicle
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── SERVICES ──────────────────────────────────────────
+  /services:
+    get:
+      operationId: listServices
+      tags: [services]
+      summary: List services
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceListResponse"
+    post:
+      operationId: createService
+      tags: [services]
+      summary: Create service
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+
+  /services/{id}:
+    get:
+      operationId: getService
+      tags: [services]
+      summary: Get service by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+    put:
+      operationId: updateService
+      tags: [services]
+      summary: Update service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+    delete:
+      operationId: deleteService
+      tags: [services]
+      summary: Delete service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── APPOINTMENTS ──────────────────────────────────────
+  /appointments:
+    get:
+      operationId: listAppointments
+      tags: [appointments]
+      summary: List appointments
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/AppointmentStatus"
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: customerId
+          in: query
+          schema:
+            type: integer
+        - name: vehicleId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentListResponse"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      summary: Create appointment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentDetail"
+
+  /appointments/{id}:
+    get:
+      operationId: getAppointment
+      tags: [appointments]
+      summary: Get appointment by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentDetail"
+    put:
+      operationId: updateAppointment
+      tags: [appointments]
+      summary: Update appointment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppointmentRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentDetail"
+    delete:
+      operationId: deleteAppointment
+      tags: [appointments]
+      summary: Delete appointment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /appointments/{id}/status:
+    patch:
+      operationId: updateAppointmentStatus
+      tags: [appointments]
+      summary: Update appointment status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentStatusInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentDetail"
+
+  # ── ORDER SERVICES ─────────────────────────────────────
+  /appointments/{id}/order-service:
+    get:
+      operationId: getOrderService
+      tags: [order-services]
+      summary: Get order of service for appointment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderService"
+    post:
+      operationId: createOrderService
+      tags: [order-services]
+      summary: Create order of service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderServiceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderService"
+    put:
+      operationId: updateOrderService
+      tags: [order-services]
+      summary: Update order of service
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderServiceRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderService"
+
+  # ── PRODUCTS ──────────────────────────────────────────
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List products
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: lowStock
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListResponse"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create product
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get product by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    put:
+      operationId: updateProduct
+      tags: [products]
+      summary: Update product
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      summary: Delete product
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── PRODUCT USAGE ─────────────────────────────────────
+  /appointments/{id}/product-usage:
+    get:
+      operationId: listProductUsage
+      tags: [product-usage]
+      summary: List product usage for appointment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductUsage"
+    post:
+      operationId: createProductUsage
+      tags: [product-usage]
+      summary: Add product usage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductUsageRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductUsage"
+
+  /product-usage/{id}:
+    delete:
+      operationId: deleteProductUsage
+      tags: [product-usage]
+      summary: Delete product usage record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── INVENTORY ─────────────────────────────────────────
+  /inventory:
+    get:
+      operationId: listInventoryMovements
+      tags: [inventory]
+      summary: List inventory movements
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: productId
+          in: query
+          schema:
+            type: integer
+        - name: movementType
+          in: query
+          schema:
+            type: string
+            enum: [entrada, saida, ajuste]
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryMovementListResponse"
+    post:
+      operationId: createInventoryMovement
+      tags: [inventory]
+      summary: Register inventory movement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInventoryMovementRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryMovement"
+
+  # ── FINANCIAL ─────────────────────────────────────────
+  /financial:
+    get:
+      operationId: listTransactions
+      tags: [financial]
+      summary: List financial transactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [receita, despesa]
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionListResponse"
+    post:
+      operationId: createTransaction
+      tags: [financial]
+      summary: Create financial transaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialTransaction"
+
+  /financial/{id}:
+    get:
+      operationId: getTransaction
+      tags: [financial]
+      summary: Get transaction by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialTransaction"
+    put:
+      operationId: updateTransaction
+      tags: [financial]
+      summary: Update transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTransactionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialTransaction"
+    delete:
+      operationId: deleteTransaction
+      tags: [financial]
+      summary: Delete transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /financial/summary:
+    get:
+      operationId: getFinancialSummary
+      tags: [financial]
+      summary: Get financial summary (income, expenses, profit)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialSummary"
+
+  # ── NOTIFICATIONS ─────────────────────────────────────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: read
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── FEEDBACK ──────────────────────────────────────────
+  /feedback:
+    get:
+      operationId: listFeedback
+      tags: [feedback]
+      summary: List customer feedback
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackListResponse"
+    post:
+      operationId: createFeedback
+      tags: [feedback]
+      summary: Create feedback
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeedbackRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Feedback"
+
+  /feedback/{id}:
+    get:
+      operationId: getFeedback
+      tags: [feedback]
+      summary: Get feedback by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Feedback"
+    delete:
+      operationId: deleteFeedback
+      tags: [feedback]
+      summary: Delete feedback
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── LOYALTY ───────────────────────────────────────────
+  /loyalty:
+    get:
+      operationId: listLoyaltyCards
+      tags: [loyalty]
+      summary: List all loyalty cards
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: freeWashPending
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyCardListResponse"
+
+  /loyalty/{customerId}/redeem:
+    post:
+      operationId: redeemFreeWash
+      tags: [loyalty]
+      summary: Redeem a free wash
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyCard"
+
+  # ── DASHBOARD ─────────────────────────────────────────
+  /dashboard/kpis:
+    get:
+      operationId: getDashboardKpis
+      tags: [dashboard]
+      summary: Get dashboard KPIs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardKpis"
+
+  /dashboard/revenue-by-day:
+    get:
+      operationId: getRevenueByDay
+      tags: [dashboard]
+      summary: Get revenue by day for a month
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RevenueByDay"
+
+  /dashboard/revenue-by-month:
+    get:
+      operationId: getRevenueByMonth
+      tags: [dashboard]
+      summary: Get revenue by month for a year
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RevenueByMonth"
+
+  /dashboard/top-services:
+    get:
+      operationId: getTopServices
+      tags: [dashboard]
+      summary: Get most sold services
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 5
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopService"
+
+  /dashboard/top-customers:
+    get:
+      operationId: getTopCustomers
+      tags: [dashboard]
+      summary: Get top customers by revenue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 5
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopCustomer"
+
+  /dashboard/upcoming-appointments:
+    get:
+      operationId: getUpcomingAppointments
+      tags: [dashboard]
+      summary: Get upcoming appointments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AppointmentDetail"
+
+  /dashboard/customers-needing-service:
+    get:
+      operationId: getCustomersNeedingService
+      tags: [dashboard]
+      summary: Get customers who haven't returned in 30+ days
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+
+  # ── REPORTS ───────────────────────────────────────────
+  /reports/monthly:
+    get:
+      operationId: getMonthlyReport
+      tags: [reports]
+      summary: Get monthly report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonthlyReport"
+
+  /reports/services:
+    get:
+      operationId: getServicesReport
+      tags: [reports]
+      summary: Get services report
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicesReport"
+
+  # ── BACKUP ────────────────────────────────────────────
+  /backup/export:
+    get:
+      operationId: exportBackup
+      tags: [backup]
+      summary: Export database backup
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: SQLite database file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /backup/restore:
+    post:
+      operationId: restoreBackup
+      tags: [backup]
+      summary: Restore database from backup
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/BackupRestoreInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+    SearchParam:
+      name: search
+      in: query
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error, message]
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [total, page, limit, totalPages]
+
+    AppointmentStatus:
+      type: string
+      enum: [agendado, confirmado, em_andamento, concluido, cancelado]
+
+    # ── AUTH ─────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResult:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required: [token, user]
+
+    AppointmentStatusInput:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+      required: [status]
+
+    BackupRestoreInput:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+
+    # ── USER ─────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, technician, receptionist]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, email, role, active, createdAt]
+
+    CreateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        role:
+          type: string
+          enum: [admin, technician, receptionist]
+      required: [name, email, password, role]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        role:
+          type: string
+          enum: [admin, technician, receptionist]
+        active:
+          type: boolean
+
+    UserListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── CUSTOMER ──────────────────────────────────────────
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        whatsapp:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        notes:
+          type: string
+        totalSpent:
+          type: number
+        totalServices:
+          type: integer
+        lastServiceDate:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, totalSpent, totalServices, createdAt, updatedAt]
+
+    CustomerDetail:
+      allOf:
+        - $ref: "#/components/schemas/Customer"
+        - type: object
+          properties:
+            vehicles:
+              type: array
+              items:
+                $ref: "#/components/schemas/Vehicle"
+            loyaltyCard:
+              $ref: "#/components/schemas/LoyaltyCard"
+
+    CreateCustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        whatsapp:
+          type: string
+        email:
+          type: string
+          format: email
+        address:
+          type: string
+        notes:
+          type: string
+      required: [name]
+
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        whatsapp:
+          type: string
+        email:
+          type: string
+          format: email
+        address:
+          type: string
+        notes:
+          type: string
+
+    CustomerListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── VEHICLE ───────────────────────────────────────────
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        plate:
+          type: string
+        color:
+          type: string
+        fuel:
+          type: string
+          enum: [gasolina, etanol, flex, diesel, gnv, eletrico, hibrido]
+        mileage:
+          type: integer
+        notes:
+          type: string
+        customerName:
+          type: string
+      required: [id, customerId, brand, model]
+
+    CreateVehicleRequest:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        plate:
+          type: string
+        color:
+          type: string
+        fuel:
+          type: string
+          enum: [gasolina, etanol, flex, diesel, gnv, eletrico, hibrido]
+        mileage:
+          type: integer
+        notes:
+          type: string
+      required: [customerId, brand, model]
+
+    UpdateVehicleRequest:
+      type: object
+      properties:
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        plate:
+          type: string
+        color:
+          type: string
+        fuel:
+          type: string
+          enum: [gasolina, etanol, flex, diesel, gnv, eletrico, hibrido]
+        mileage:
+          type: integer
+        notes:
+          type: string
+
+    VehicleListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vehicle"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── SERVICE ───────────────────────────────────────────
+    Service:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        estimatedDuration:
+          type: integer
+          description: Duration in minutes
+        category:
+          type: string
+        vehicleType:
+          type: string
+          enum: [todos, hatch, sedan, suv, pickup, van, moto, caminhao]
+        active:
+          type: boolean
+      required: [id, name, price, active]
+
+    CreateServiceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        estimatedDuration:
+          type: integer
+        category:
+          type: string
+        vehicleType:
+          type: string
+          enum: [todos, hatch, sedan, suv, pickup, van, moto, caminhao]
+        active:
+          type: boolean
+      required: [name, price]
+
+    UpdateServiceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        estimatedDuration:
+          type: integer
+        category:
+          type: string
+        vehicleType:
+          type: string
+          enum: [todos, hatch, sedan, suv, pickup, van, moto, caminhao]
+        active:
+          type: boolean
+
+    ServiceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── APPOINTMENT ───────────────────────────────────────
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        vehicleId:
+          type: integer
+        serviceId:
+          type: integer
+        appointmentDate:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        discount:
+          type: number
+        finalPrice:
+          type: number
+        observations:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, customerId, vehicleId, serviceId, appointmentDate, status, createdAt]
+
+    AppointmentDetail:
+      allOf:
+        - $ref: "#/components/schemas/Appointment"
+        - type: object
+          properties:
+            customer:
+              $ref: "#/components/schemas/Customer"
+            vehicle:
+              $ref: "#/components/schemas/Vehicle"
+            service:
+              $ref: "#/components/schemas/Service"
+            orderService:
+              $ref: "#/components/schemas/OrderService"
+
+    CreateAppointmentRequest:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        vehicleId:
+          type: integer
+        serviceId:
+          type: integer
+        appointmentDate:
+          type: string
+          format: date-time
+        discount:
+          type: number
+        observations:
+          type: string
+      required: [customerId, vehicleId, serviceId, appointmentDate]
+
+    UpdateAppointmentRequest:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        vehicleId:
+          type: integer
+        serviceId:
+          type: integer
+        appointmentDate:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        discount:
+          type: number
+        finalPrice:
+          type: number
+        observations:
+          type: string
+
+    AppointmentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppointmentDetail"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── ORDER SERVICE ─────────────────────────────────────
+    OrderService:
+      type: object
+      properties:
+        id:
+          type: integer
+        appointmentId:
+          type: integer
+        beforePhotos:
+          type: array
+          items:
+            type: string
+        afterPhotos:
+          type: array
+          items:
+            type: string
+        checklist:
+          type: object
+          additionalProperties: true
+        observations:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [dinheiro, cartao_credito, cartao_debito, pix, transferencia]
+        technician:
+          type: string
+        signature:
+          type: string
+      required: [id, appointmentId]
+
+    CreateOrderServiceRequest:
+      type: object
+      properties:
+        beforePhotos:
+          type: array
+          items:
+            type: string
+        afterPhotos:
+          type: array
+          items:
+            type: string
+        checklist:
+          type: object
+          additionalProperties: true
+        observations:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [dinheiro, cartao_credito, cartao_debito, pix, transferencia]
+        technician:
+          type: string
+        signature:
+          type: string
+
+    UpdateOrderServiceRequest:
+      type: object
+      properties:
+        beforePhotos:
+          type: array
+          items:
+            type: string
+        afterPhotos:
+          type: array
+          items:
+            type: string
+        checklist:
+          type: object
+          additionalProperties: true
+        observations:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [dinheiro, cartao_credito, cartao_debito, pix, transferencia]
+        technician:
+          type: string
+        signature:
+          type: string
+
+    # ── PRODUCT ───────────────────────────────────────────
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        brand:
+          type: string
+        supplier:
+          type: string
+        purchasePrice:
+          type: number
+        salePrice:
+          type: number
+        stock:
+          type: number
+        minimumStock:
+          type: number
+        unit:
+          type: string
+        isLowStock:
+          type: boolean
+      required: [id, name, stock, minimumStock]
+
+    CreateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        brand:
+          type: string
+        supplier:
+          type: string
+        purchasePrice:
+          type: number
+        salePrice:
+          type: number
+        stock:
+          type: number
+        minimumStock:
+          type: number
+        unit:
+          type: string
+      required: [name, stock, minimumStock]
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        brand:
+          type: string
+        supplier:
+          type: string
+        purchasePrice:
+          type: number
+        salePrice:
+          type: number
+        stock:
+          type: number
+        minimumStock:
+          type: number
+        unit:
+          type: string
+
+    ProductListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── PRODUCT USAGE ─────────────────────────────────────
+    ProductUsage:
+      type: object
+      properties:
+        id:
+          type: integer
+        appointmentId:
+          type: integer
+        productId:
+          type: integer
+        quantity:
+          type: number
+        product:
+          $ref: "#/components/schemas/Product"
+      required: [id, appointmentId, productId, quantity]
+
+    CreateProductUsageRequest:
+      type: object
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: number
+      required: [productId, quantity]
+
+    # ── INVENTORY ─────────────────────────────────────────
+    InventoryMovement:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        movementType:
+          type: string
+          enum: [entrada, saida, ajuste]
+        quantity:
+          type: number
+        reason:
+          type: string
+        appointmentId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        product:
+          $ref: "#/components/schemas/Product"
+      required: [id, productId, movementType, quantity, createdAt]
+
+    CreateInventoryMovementRequest:
+      type: object
+      properties:
+        productId:
+          type: integer
+        movementType:
+          type: string
+          enum: [entrada, saida, ajuste]
+        quantity:
+          type: number
+        reason:
+          type: string
+        appointmentId:
+          type: integer
+      required: [productId, movementType, quantity]
+
+    InventoryMovementListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryMovement"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── FINANCIAL ─────────────────────────────────────────
+    FinancialTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [receita, despesa]
+        category:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        date:
+          type: string
+          format: date
+        appointmentId:
+          type: integer
+        paymentMethod:
+          type: string
+          enum: [dinheiro, cartao_credito, cartao_debito, pix, transferencia]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, description, amount, date, createdAt]
+
+    CreateTransactionRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [receita, despesa]
+        category:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        date:
+          type: string
+          format: date
+        appointmentId:
+          type: integer
+        paymentMethod:
+          type: string
+          enum: [dinheiro, cartao_credito, cartao_debito, pix, transferencia]
+      required: [type, description, amount, date]
+
+    UpdateTransactionRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [receita, despesa]
+        category:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        date:
+          type: string
+          format: date
+        paymentMethod:
+          type: string
+          enum: [dinheiro, cartao_credito, cartao_debito, pix, transferencia]
+
+    TransactionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinancialTransaction"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    FinancialSummary:
+      type: object
+      properties:
+        totalRevenue:
+          type: number
+        totalExpenses:
+          type: number
+        profit:
+          type: number
+        month:
+          type: integer
+        year:
+          type: integer
+      required: [totalRevenue, totalExpenses, profit, month, year]
+
+    # ── NOTIFICATIONS ─────────────────────────────────────
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [reminder_1d, reminder_15d, reminder_30d, reminder_45d, loyalty, system]
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        customer:
+          $ref: "#/components/schemas/Customer"
+      required: [id, title, message, type, read, createdAt]
+
+    NotificationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+        unreadCount:
+          type: integer
+      required: [data, meta, unreadCount]
+
+    # ── FEEDBACK ──────────────────────────────────────────
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        appointmentId:
+          type: integer
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        customer:
+          $ref: "#/components/schemas/Customer"
+      required: [id, customerId, rating, createdAt]
+
+    CreateFeedbackRequest:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        appointmentId:
+          type: integer
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+      required: [customerId, rating]
+
+    FeedbackListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Feedback"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+        averageRating:
+          type: number
+      required: [data, meta, averageRating]
+
+    # ── LOYALTY ───────────────────────────────────────────
+    LoyaltyCard:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        totalWashes:
+          type: integer
+        currentStampCount:
+          type: integer
+        freeWashesEarned:
+          type: integer
+        freeWashesUsed:
+          type: integer
+        freeWashesPending:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+        customer:
+          $ref: "#/components/schemas/Customer"
+      required: [id, customerId, totalWashes, currentStampCount, freeWashesEarned, freeWashesUsed, freeWashesPending]
+
+    LoyaltyCardListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoyaltyCard"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required: [data, meta]
+
+    # ── DASHBOARD ─────────────────────────────────────────
+    DashboardKpis:
+      type: object
+      properties:
+        monthlyRevenue:
+          type: number
+        monthlyProfit:
+          type: number
+        averageTicket:
+          type: number
+        totalAppointments:
+          type: integer
+        completedAppointments:
+          type: integer
+        vehiclesServiced:
+          type: integer
+        hoursWorked:
+          type: number
+        newCustomers:
+          type: integer
+        pendingAppointments:
+          type: integer
+        lowStockProducts:
+          type: integer
+        unreadNotifications:
+          type: integer
+        revenueGrowth:
+          type: number
+          description: Percentage growth compared to previous month
+      required: [monthlyRevenue, monthlyProfit, averageTicket, totalAppointments, completedAppointments, vehiclesServiced, hoursWorked, newCustomers, pendingAppointments, lowStockProducts, unreadNotifications, revenueGrowth]
+
+    RevenueByDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        revenue:
+          type: number
+        appointments:
+          type: integer
+      required: [date, revenue, appointments]
+
+    RevenueByMonth:
+      type: object
+      properties:
+        month:
+          type: integer
+        year:
+          type: integer
+        revenue:
+          type: number
+        expenses:
+          type: number
+        profit:
+          type: number
+        appointments:
+          type: integer
+      required: [month, year, revenue, expenses, profit, appointments]
+
+    TopService:
+      type: object
+      properties:
+        serviceId:
+          type: integer
+        serviceName:
+          type: string
+        count:
+          type: integer
+        revenue:
+          type: number
+      required: [serviceId, serviceName, count, revenue]
+
+    TopCustomer:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        totalSpent:
+          type: number
+        totalServices:
+          type: integer
+      required: [customerId, customerName, totalSpent, totalServices]
+
+    # ── REPORTS ───────────────────────────────────────────
+    MonthlyReport:
+      type: object
+      properties:
+        month:
+          type: integer
+        year:
+          type: integer
+        totalRevenue:
+          type: number
+        totalExpenses:
+          type: number
+        profit:
+          type: number
+        totalAppointments:
+          type: integer
+        completedAppointments:
+          type: integer
+        cancelledAppointments:
+          type: integer
+        newCustomers:
+          type: integer
+        topServices:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopService"
+        revenueByDay:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevenueByDay"
+      required: [month, year, totalRevenue, totalExpenses, profit, totalAppointments, completedAppointments, cancelledAppointments, newCustomers, topServices, revenueByDay]
+
+    ServicesReport:
+      type: object
+      properties:
+        dateFrom:
+          type: string
+          format: date
+        dateTo:
+          type: string
+          format: date
+        totalServices:
+          type: integer
+        totalRevenue:
+          type: number
+        byCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              count:
+                type: integer
+              revenue:
+                type: number
+            required: [category, count, revenue]
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+            required: [status, count]
+      required: [dateFrom, dateTo, totalServices, totalRevenue, byCategory, byStatus]

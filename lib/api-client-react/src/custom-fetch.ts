@@ -349,18 +349,28 @@ export async function customFetch<T = unknown>(
     headers.set("accept", DEFAULT_JSON_ACCEPT);
   }
 
-  // Attach bearer token when an auth getter is configured and no
-  // Authorization header has been explicitly provided.
-  if (_authTokenGetter && !headers.has("authorization")) {
-    const token = await _authTokenGetter();
+  if (!headers.has("authorization")) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('elton_garage_token') : null;
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    } else if (_authTokenGetter) {
+      const getterToken = await _authTokenGetter();
+      if (getterToken) {
+        headers.set("authorization", `Bearer ${getterToken}`);
+      }
     }
   }
 
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });
+
+  if (response.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('elton_garage_token');
+      window.location.href = '/login';
+    }
+  }
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
