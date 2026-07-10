@@ -14,6 +14,7 @@ Variáveis de ambiente necessárias:
   - deve ser copiado como texto no painel de variáveis do Render
 - `SESSION_SECRET`
   - string aleatória para assinar tokens/sessões
+  - deve estar definida no serviço Render antes de iniciar
 - `NODE_ENV`
   - `production` (recomendado)
 

@@ -1,7 +1,7 @@
 services:
   - type: web
     name: elton-garage-api
-    runtime: node
+    env: node
     region: oregon
     plan: free
     buildCommand: pnpm install --frozen-lockfile && pnpm run build:render
