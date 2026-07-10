@@ -148,20 +148,28 @@ router.put("/:id", (req, res) => {
 
   const { customerId, vehicleId, serviceIds, appointmentDate, status, discount, finalPrice, observations } = req.body as any;
 
+  // Validate serviceIds BEFORE the transaction so we can early-return from the route.
+  // Doing this inside db.transaction() only exits the callback, not the route handler,
+  // which causes a double-response (ERR_HTTP_HEADERS_SENT).
+  let validatedServiceRows: any[] | null = null;
+  if (serviceIds?.length) {
+    const ids: number[] = Array.isArray(serviceIds) ? serviceIds : [serviceIds];
+    const placeholders = ids.map(() => "?").join(",");
+    const rows = db.prepare(`SELECT id, price FROM services WHERE id IN (${placeholders})`).all(...ids) as any[];
+    if (rows.length !== ids.length) {
+      res.status(400).json({ error: "validation", message: "Um ou mais serviços informados não existem" });
+      return;
+    }
+    validatedServiceRows = rows;
+  }
+
   const updateAppointment = db.transaction(() => {
-    // Recalculate price if serviceIds provided
     let newFinalPrice = finalPrice ?? a.final_price;
     let newDiscount = discount ?? a.discount ?? 0;
 
-    if (serviceIds?.length) {
+    if (validatedServiceRows) {
       const ids: number[] = Array.isArray(serviceIds) ? serviceIds : [serviceIds];
-      const placeholders = ids.map(() => "?").join(",");
-      const serviceRows = db.prepare(`SELECT id, price FROM services WHERE id IN (${placeholders})`).all(...ids) as any[];
-      if (serviceRows.length !== ids.length) {
-        res.status(400).json({ error: "validation", message: "Um ou mais serviços informados não existem" });
-        return;
-      }
-      const subtotal = serviceRows.reduce((sum: number, s: any) => sum + s.price, 0);
+      const subtotal = validatedServiceRows.reduce((sum: number, s: any) => sum + s.price, 0);
       newFinalPrice = finalPrice ?? Math.max(0, subtotal - newDiscount);
 
       // Replace junction entries
