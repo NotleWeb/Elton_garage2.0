@@ -2,9 +2,8 @@ import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { login } from '@workspace/api-client-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,16 +30,8 @@ export default function Login() {
 
   const onSubmit = async (data: LoginForm) => {
     try {
-      const credential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      const idToken = await credential.user.getIdToken();
-      setAuth(idToken, {
-        id: 0,
-        name: credential.user.email ?? '',
-        email: credential.user.email ?? '',
-        role: 'receptionist',
-        active: true,
-        createdAt: new Date().toISOString()
-      });
+      const authResult = await login({ email: data.email, password: data.password });
+      setAuth(authResult.token, authResult.user);
       toast({ title: 'Login realizado com sucesso!' });
       setLocation('/dashboard');
     } catch (error) {
