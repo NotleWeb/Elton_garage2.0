@@ -1,1 +1,3 @@
 - [Multi-service appointments schema](multi-service-appointments.md) — junction table appointment_services replaced service_id; migration via PRAGMA foreign_keys OFF outside any transaction.
+- [PostgreSQL migration patterns](pg-migration-patterns.md) — SQLite→PG conversion patterns for all route files; pg accessible via workspace even without explicit declaration.
+- [Replit file write quirks](replit-file-write-quirks.md) — overwriting tracked git files silently fails; must delete first then write fresh.
