@@ -1,30 +1,83 @@
-import { Router } from "express";
-import path from "path";
-import { fileURLToPath } from "url";
+import { Router, Request, Response } from "express";
 import { authMiddleware } from "../middleware/auth.js";
-import multer from "multer";
-import fs from "fs";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, "..", "..", "elton_garage.db");
+import { db } from "../db.js";
 
 const router = Router();
 router.use(authMiddleware);
-const upload = multer({ dest: "/tmp/backup_uploads/" });
 
-router.get("/export", (_req, res) => {
-  if (!fs.existsSync(DB_PATH)) { res.status(404).json({ error: "not_found", message: "Banco de dados não encontrado" }); return; }
-  res.download(DB_PATH, "elton_garage_backup.db");
-});
+const TABLES = [
+  "users",
+  "customers",
+  "vehicles",
+  "services",
+  "appointments",
+  "appointment_services",
+  "order_services",
+  "products",
+  "product_usage",
+  "inventory_movements",
+  "financial_transactions",
+  "notifications",
+  "feedback",
+  "loyalty_cards",
+];
 
-router.post("/restore", upload.single("file"), (req, res) => {
-  if (!req.file) { res.status(400).json({ error: "validation", message: "Arquivo não fornecido" }); return; }
+function escapeLiteral(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (typeof value === "number") return String(value);
+  if (value instanceof Date) return `'${value.toISOString()}'`;
+  const str = String(value).replace(/\\/g, "\\\\").replace(/'/g, "''");
+  return `'${str}'`;
+}
+
+router.get("/export", async (_req: Request, res: Response) => {
   try {
-    fs.copyFileSync(req.file.path, DB_PATH);
-    fs.unlinkSync(req.file.path);
-    res.json({ message: "Banco de dados restaurado com sucesso. Reinicie o servidor." });
-  } catch (e) {
-    res.status(500).json({ error: "server_error", message: "Erro ao restaurar backup" });
+    const lines: string[] = [];
+    lines.push("-- Elton Garage — PostgreSQL backup");
+    lines.push(`-- Gerado em: ${new Date().toISOString()}`);
+    lines.push("");
+    lines.push("SET client_encoding = 'UTF8';");
+    lines.push("SET standard_conforming_strings = on;");
+    lines.push("");
+
+    for (const table of TABLES) {
+      const rows = await db.all<Record<string, unknown>>(`SELECT * FROM ${table}`, []);
+      lines.push(`-- Tabela: ${table} (${rows.length} registros)`);
+      if (rows.length === 0) { lines.push(""); continue; }
+
+      const columns = Object.keys(rows[0]);
+      const columnList = columns.map((c) => `"${c}"`).join(", ");
+      lines.push(`INSERT INTO "${table}" (${columnList}) VALUES`);
+
+      rows.forEach((row, i) => {
+        const vals = columns.map((col) => escapeLiteral(row[col])).join(", ");
+        const comma = i < rows.length - 1 ? "," : ";";
+        lines.push(`  (${vals})${comma}`);
+      });
+      lines.push("");
+    }
+
+    lines.push("-- Reiniciar sequences");
+    for (const table of TABLES) {
+      const seqResult = await db.get<{ exists: boolean }>(
+        `SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND c.relname = $1) AS exists`,
+        [`${table}_id_seq`]
+      );
+      if (seqResult?.exists) {
+        lines.push(`SELECT setval('${table}_id_seq', COALESCE((SELECT MAX(id) FROM "${table}"), 1));`);
+      }
+    }
+    lines.push("");
+    lines.push("-- Fim do backup");
+
+    const sql = lines.join("\n");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="elton_garage_backup_${new Date().toISOString().slice(0, 10)}.sql"`);
+    res.send(sql);
+  } catch (err) {
+    console.error("Erro ao gerar backup:", err);
+    res.status(500).json({ error: "server_error", message: "Erro ao gerar backup SQL" });
   }
 });
 
