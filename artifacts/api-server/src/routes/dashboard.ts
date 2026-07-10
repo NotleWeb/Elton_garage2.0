@@ -13,6 +13,40 @@ function getPeriodFilter(month?: number, year?: number) {
   return { prefix: `${y}-${monthStr}`, month: m, year: y };
 }
 
+/** Load services for multiple appointment IDs, returns Map<appointmentId, services[]> */
+function loadServicesMap(appointmentIds: number[]): Map<number, any[]> {
+  if (!appointmentIds.length) return new Map();
+  const placeholders = appointmentIds.map(() => "?").join(",");
+  const rows = db.prepare(`
+    SELECT aps.appointment_id, s.id, s.name, s.price, s.estimated_duration, s.category
+    FROM appointment_services aps
+    JOIN services s ON s.id = aps.service_id
+    WHERE aps.appointment_id IN (${placeholders})
+  `).all(...appointmentIds) as any[];
+  const map = new Map<number, any[]>();
+  for (const row of rows) {
+    if (!map.has(row.appointment_id)) map.set(row.appointment_id, []);
+    map.get(row.appointment_id)!.push({
+      id: row.id, name: row.name, price: row.price,
+      estimatedDuration: row.estimated_duration, category: row.category,
+    });
+  }
+  return map;
+}
+
+function mapAppointmentDetail(a: any, services: any[]) {
+  const totalDuration = services.reduce((s, sv) => s + (sv.estimatedDuration || 0), 0);
+  return {
+    id: a.id, customerId: a.customer_id, vehicleId: a.vehicle_id,
+    serviceIds: services.map((s) => s.id),
+    appointmentDate: a.appointment_date, status: a.status, discount: a.discount ?? 0,
+    finalPrice: a.final_price, totalDuration, observations: a.observations, createdAt: a.created_at,
+    customer: { id: a.cid, name: a.cname, phone: a.cphone, email: a.cemail, totalSpent: a.ctotal_spent, totalServices: a.ctotal_services, createdAt: a.ccreated_at, updatedAt: a.cupdated_at },
+    vehicle: { id: a.vid, customerId: a.customer_id, brand: a.vbrand, model: a.vmodel, plate: a.vplate, color: a.vcolor, fuel: a.vfuel, year: a.vyear },
+    services,
+  };
+}
+
 router.get("/kpis", (req, res) => {
   const { month, year } = req.query as any;
   const { prefix, month: m, year: y } = getPeriodFilter(month ? Number(month) : undefined, year ? Number(year) : undefined);
@@ -33,8 +67,15 @@ router.get("/kpis", (req, res) => {
   const pendingAppointments = (db.prepare("SELECT COUNT(*) as c FROM appointments WHERE status IN ('agendado','confirmado','em_andamento')").get() as any).c;
   const vehiclesServiced = (db.prepare("SELECT COUNT(DISTINCT vehicle_id) as c FROM appointments WHERE status='concluido' AND appointment_date LIKE ?").get(`${prefix}%`) as any).c;
 
-  const services = db.prepare("SELECT s.estimated_duration FROM appointments a JOIN services s ON s.id = a.service_id WHERE a.status='concluido' AND a.appointment_date LIKE ?").all(`${prefix}%`) as any[];
-  const hoursWorked = services.reduce((sum, s) => sum + (s.estimated_duration || 0), 0) / 60;
+  // Hours worked: sum estimated_duration from appointment_services for completed appointments
+  const svcDurations = db.prepare(`
+    SELECT s.estimated_duration
+    FROM appointments a
+    JOIN appointment_services aps ON aps.appointment_id = a.id
+    JOIN services s ON s.id = aps.service_id
+    WHERE a.status='concluido' AND a.appointment_date LIKE ?
+  `).all(`${prefix}%`) as any[];
+  const hoursWorked = svcDurations.reduce((sum, s) => sum + (s.estimated_duration || 0), 0) / 60;
 
   const avgTicket = completedAppointments > 0 ? monthlyRevenue / completedAppointments : 0;
   const newCustomers = (db.prepare("SELECT COUNT(*) as c FROM customers WHERE created_at LIKE ?").get(`${prefix}%`) as any).c;
@@ -68,11 +109,19 @@ router.get("/revenue-by-month", (req, res) => {
 router.get("/top-services", (req, res) => {
   const { month, year, limit = 5 } = req.query as any;
   const { prefix } = getPeriodFilter(month ? Number(month) : undefined, year ? Number(year) : undefined);
+  // Count each service occurrence across appointments; distribute revenue proportionally
   const rows = db.prepare(`
-    SELECT s.id as serviceId, s.name as serviceName, COUNT(*) as count, COALESCE(SUM(a.final_price), 0) as revenue
-    FROM appointments a JOIN services s ON s.id = a.service_id
+    SELECT s.id as serviceId, s.name as serviceName, COUNT(*) as count,
+      COALESCE(SUM(
+        a.final_price * 1.0 / NULLIF((SELECT COUNT(*) FROM appointment_services aps2 WHERE aps2.appointment_id = a.id), 0)
+      ), 0) as revenue
+    FROM appointments a
+    JOIN appointment_services aps ON aps.appointment_id = a.id
+    JOIN services s ON s.id = aps.service_id
     WHERE a.status='concluido' AND a.appointment_date LIKE ?
-    GROUP BY s.id ORDER BY count DESC LIMIT ?
+    GROUP BY s.id
+    ORDER BY count DESC
+    LIMIT ?
   `).all(`${prefix}%`, Number(limit)) as any[];
   res.json(rows.map(r => ({ serviceId: r.serviceId, serviceName: r.serviceName, count: r.count, revenue: r.revenue })));
 });
@@ -92,15 +141,20 @@ router.get("/top-customers", (req, res) => {
 router.get("/upcoming-appointments", (req, res) => {
   const { limit = 10 } = req.query as any;
   const now = new Date().toISOString();
-  const data = db.prepare(`
-    SELECT a.*, c.id as cid, c.name as cname, c.phone as cphone, c.email as cemail, c.total_spent as ctotal_spent, c.total_services as ctotal_services, c.created_at as ccreated_at, c.updated_at as cupdated_at,
-    v.id as vid, v.brand as vbrand, v.model as vmodel, v.plate as vplate, v.color as vcolor, v.fuel as vfuel, v.year as vyear,
-    s.id as sid, s.name as sname, s.price as sprice, s.estimated_duration as sduration, s.category as scategory
-    FROM appointments a JOIN customers c ON c.id = a.customer_id JOIN vehicles v ON v.id = a.vehicle_id JOIN services s ON s.id = a.service_id
+  const rows = db.prepare(`
+    SELECT a.*,
+      c.id as cid, c.name as cname, c.phone as cphone, c.email as cemail, c.total_spent as ctotal_spent, c.total_services as ctotal_services, c.created_at as ccreated_at, c.updated_at as cupdated_at,
+      v.id as vid, v.brand as vbrand, v.model as vmodel, v.plate as vplate, v.color as vcolor, v.fuel as vfuel, v.year as vyear
+    FROM appointments a
+    JOIN customers c ON c.id = a.customer_id
+    JOIN vehicles v ON v.id = a.vehicle_id
     WHERE a.appointment_date >= ? AND a.status IN ('agendado','confirmado')
     ORDER BY a.appointment_date ASC LIMIT ?
   `).all(now, Number(limit)) as any[];
-  res.json(data.map(mapAppointmentDetail));
+
+  const ids = rows.map((r) => r.id);
+  const svcMap = loadServicesMap(ids);
+  res.json(rows.map((r) => mapAppointmentDetail(r, svcMap.get(r.id) || [])));
 });
 
 router.get("/customers-needing-service", (req, res) => {
@@ -112,16 +166,5 @@ router.get("/customers-needing-service", (req, res) => {
   `).all(cutoff.toISOString(), cutoff.toISOString(), Number(limit)) as any[];
   res.json(rows.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone, whatsapp: c.whatsapp, email: c.email, totalSpent: c.total_spent, totalServices: c.total_services, lastServiceDate: c.last_service_date, createdAt: c.created_at, updatedAt: c.updated_at })));
 });
-
-function mapAppointmentDetail(a: any) {
-  return {
-    id: a.id, customerId: a.customer_id, vehicleId: a.vehicle_id, serviceId: a.service_id,
-    appointmentDate: a.appointment_date, status: a.status, discount: a.discount ?? 0,
-    finalPrice: a.final_price, observations: a.observations, createdAt: a.created_at,
-    customer: { id: a.cid, name: a.cname, phone: a.cphone, email: a.cemail, totalSpent: a.ctotal_spent, totalServices: a.ctotal_services, createdAt: a.ccreated_at, updatedAt: a.cupdated_at },
-    vehicle: { id: a.vid, customerId: a.customer_id, brand: a.vbrand, model: a.vmodel, plate: a.vplate, color: a.vcolor, fuel: a.vfuel, year: a.vyear },
-    service: { id: a.sid, name: a.sname, price: a.sprice, estimatedDuration: a.sduration, category: a.scategory },
-  };
-}
 
 export default router;

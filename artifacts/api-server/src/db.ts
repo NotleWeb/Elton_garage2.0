@@ -69,7 +69,6 @@ export function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_id INTEGER NOT NULL,
       vehicle_id INTEGER NOT NULL,
-      service_id INTEGER NOT NULL,
       appointment_date TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'agendado' CHECK(status IN ('agendado','confirmado','em_andamento','concluido','cancelado')),
       discount REAL DEFAULT 0,
@@ -77,7 +76,15 @@ export function initDb() {
       observations TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (customer_id) REFERENCES customers(id),
-      FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+      FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS appointment_services (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      appointment_id INTEGER NOT NULL,
+      service_id INTEGER NOT NULL,
+      UNIQUE(appointment_id, service_id),
+      FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
       FOREIGN KEY (service_id) REFERENCES services(id)
     );
 
@@ -176,6 +183,8 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id);
     CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
     CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+    CREATE INDEX IF NOT EXISTS idx_appointment_services_apt ON appointment_services(appointment_id);
+    CREATE INDEX IF NOT EXISTS idx_appointment_services_svc ON appointment_services(service_id);
     CREATE INDEX IF NOT EXISTS idx_vehicles_customer ON vehicles(customer_id);
     CREATE INDEX IF NOT EXISTS idx_financial_date ON financial_transactions(date);
     CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory_movements(product_id);
@@ -191,6 +200,83 @@ export function initDb() {
   }
 
   seedDemoData();
+}
+
+/**
+ * Runs once on startup to migrate databases created before the many-to-many
+ * appointment_services schema. Detects the old service_id column on appointments,
+ * copies its data to appointment_services, then recreates the table without it.
+ *
+ * NOTE: PRAGMA foreign_keys cannot be changed inside a transaction (it is silently
+ * ignored by SQLite). This function therefore performs the schema change outside any
+ * explicit transaction wrapper, bracketing only with the pragma.
+ */
+export function runMigrations() {
+  // Check if appointments still has service_id column
+  const cols = db.pragma("table_info(appointments)") as Array<{ name: string }>;
+  const hasServiceId = cols.some((c) => c.name === "service_id");
+  if (!hasServiceId) return; // Already migrated
+
+  console.log("[migration] Detected legacy service_id column — migrating to appointment_services...");
+
+  // Must be set OUTSIDE any active transaction — SQLite ignores this pragma inside BEGIN/COMMIT
+  db.pragma("foreign_keys = OFF");
+
+  try {
+    // Step 1: ensure junction table exists
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS appointment_services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        appointment_id INTEGER NOT NULL,
+        service_id INTEGER NOT NULL,
+        UNIQUE(appointment_id, service_id),
+        FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+        FOREIGN KEY (service_id) REFERENCES services(id)
+      );
+    `);
+
+    // Step 2: copy existing service_id rows → junction table
+    db.prepare(`
+      INSERT OR IGNORE INTO appointment_services (appointment_id, service_id)
+      SELECT id, service_id FROM appointments WHERE service_id IS NOT NULL
+    `).run();
+
+    // Step 3: Recreate appointments without service_id using SQLite's rename/copy/drop/rename pattern
+    // (ALTER TABLE DROP COLUMN is only available in SQLite 3.35+; rename pattern is safest)
+    db.exec(`
+      CREATE TABLE appointments_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        vehicle_id INTEGER NOT NULL,
+        appointment_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'agendado' CHECK(status IN ('agendado','confirmado','em_andamento','concluido','cancelado')),
+        discount REAL DEFAULT 0,
+        final_price REAL,
+        observations TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (customer_id) REFERENCES customers(id),
+        FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+      );
+
+      INSERT INTO appointments_new (id, customer_id, vehicle_id, appointment_date, status, discount, final_price, observations, created_at)
+      SELECT id, customer_id, vehicle_id, appointment_date, status, discount, final_price, observations, created_at
+      FROM appointments;
+
+      DROP TABLE appointments;
+      ALTER TABLE appointments_new RENAME TO appointments;
+
+      CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+      CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+      CREATE INDEX IF NOT EXISTS idx_appointment_services_apt ON appointment_services(appointment_id);
+      CREATE INDEX IF NOT EXISTS idx_appointment_services_svc ON appointment_services(service_id);
+    `);
+  } finally {
+    // Always re-enable FK enforcement
+    db.pragma("foreign_keys = ON");
+  }
+
+  console.log("[migration] Migration complete — appointment_services populated, service_id removed.");
 }
 
 function seedDemoData() {
@@ -227,22 +313,34 @@ function seedDemoData() {
   const insertProduct = db.prepare(
     "INSERT INTO products (name, brand, supplier, purchase_price, sale_price, stock, minimum_stock, unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
   );
-  const p1 = insertProduct.run("Shampoo Automotivo", "Meguiar's", "Distribuidora Auto", 35.0, 60.0, 15, 5, "un");
-  const p2 = insertProduct.run("Cera Carnaúba", "Vonixx", "Distribuidora Auto", 45.0, 80.0, 8, 3, "un");
-  const p3 = insertProduct.run("Microfibra Premium", "Autoamerica", "Distribuidora Auto", 12.0, 25.0, 3, 10, "un");
-  const p4 = insertProduct.run("Polidor de Corte", "Meguiar's", "Distribuidora Auto", 55.0, 95.0, 6, 2, "un");
+  insertProduct.run("Shampoo Automotivo", "Meguiar's", "Distribuidora Auto", 35.0, 60.0, 15, 5, "un");
+  insertProduct.run("Cera Carnaúba", "Vonixx", "Distribuidora Auto", 45.0, 80.0, 8, 3, "un");
+  insertProduct.run("Microfibra Premium", "Autoamerica", "Distribuidora Auto", 12.0, 25.0, 3, 10, "un");
+  insertProduct.run("Polidor de Corte", "Meguiar's", "Distribuidora Auto", 55.0, 95.0, 6, 2, "un");
 
-  // Seed appointments
+  // Seed appointments (no service_id — use junction table)
   const today = new Date();
   const insertApp = db.prepare(
-    "INSERT INTO appointments (customer_id, vehicle_id, service_id, appointment_date, status, final_price) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO appointments (customer_id, vehicle_id, appointment_date, status, final_price) VALUES (?, ?, ?, ?, ?)"
   );
+  const insertJunction = db.prepare("INSERT OR IGNORE INTO appointment_services (appointment_id, service_id) VALUES (?, ?)");
+
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
 
-  const a1 = insertApp.run(c1.lastInsertRowid, v1.lastInsertRowid, s1.lastInsertRowid, tomorrow.toISOString(), "agendado", 80.0);
-  const a2 = insertApp.run(c2.lastInsertRowid, v2.lastInsertRowid, s2.lastInsertRowid, today.toISOString(), "em_andamento", 250.0);
-  const a3 = insertApp.run(c3.lastInsertRowid, v3.lastInsertRowid, s4.lastInsertRowid, yesterday.toISOString(), "concluido", 800.0);
+  // a1: Lavagem Completa only
+  const a1 = insertApp.run(c1.lastInsertRowid, v1.lastInsertRowid, tomorrow.toISOString(), "agendado", 80.0);
+  insertJunction.run(a1.lastInsertRowid, s1.lastInsertRowid);
+
+  // a2: Polimento + Higienização (multi-service)
+  const a2 = insertApp.run(c2.lastInsertRowid, v2.lastInsertRowid, today.toISOString(), "em_andamento", 600.0);
+  insertJunction.run(a2.lastInsertRowid, s2.lastInsertRowid);
+  insertJunction.run(a2.lastInsertRowid, s3.lastInsertRowid);
+
+  // a3: Vitrificação + Cristalização (multi-service)
+  const a3 = insertApp.run(c3.lastInsertRowid, v3.lastInsertRowid, yesterday.toISOString(), "concluido", 920.0);
+  insertJunction.run(a3.lastInsertRowid, s4.lastInsertRowid);
+  insertJunction.run(a3.lastInsertRowid, s5.lastInsertRowid);
 
   // Seed loyalty cards
   const insertLoyalty = db.prepare(
@@ -257,7 +355,7 @@ function seedDemoData() {
     "INSERT INTO financial_transactions (type, category, description, amount, date, appointment_id, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?)"
   );
   const dateStr = (d: Date) => d.toISOString().split("T")[0];
-  insertTx.run("receita", "Serviços", "Vitrificação - Roberto Ferreira", 800.0, dateStr(yesterday), a3.lastInsertRowid, "pix");
+  insertTx.run("receita", "Serviços", "Vitrificação, Cristalização de Vidros - Roberto Ferreira", 920.0, dateStr(yesterday), a3.lastInsertRowid, "pix");
 
   // Seed notifications
   db.prepare(

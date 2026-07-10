@@ -86,14 +86,43 @@ router.get("/:id/vehicles", (req, res) => {
 router.get("/:id/appointments", (req, res) => {
   const id = Number(req.params.id);
   const appointments = db.prepare(`
-    SELECT a.*, c.id as cid, c.name as cname, v.id as vid, v.brand, v.model, v.plate, s.id as sid, s.name as sname, s.price as sprice
+    SELECT a.*, c.id as cid, c.name as cname, v.id as vid, v.brand, v.model, v.plate
     FROM appointments a
     JOIN customers c ON c.id = a.customer_id
     JOIN vehicles v ON v.id = a.vehicle_id
-    JOIN services s ON s.id = a.service_id
     WHERE a.customer_id = ? ORDER BY a.appointment_date DESC
-  `).all(id);
-  const data = appointments.map(mapAppointmentDetail);
+  `).all(id) as any[];
+
+  // Batch-load services for all appointments
+  const aptIds = appointments.map((a: any) => a.id);
+  const svcMap = aptIds.length ? (() => {
+    const placeholders = aptIds.map(() => "?").join(",");
+    const rows = db.prepare(`
+      SELECT aps.appointment_id, s.id, s.name, s.price, s.estimated_duration, s.category
+      FROM appointment_services aps
+      JOIN services s ON s.id = aps.service_id
+      WHERE aps.appointment_id IN (${placeholders})
+    `).all(...aptIds) as any[];
+    const map = new Map<number, any[]>();
+    for (const row of rows) {
+      if (!map.has(row.appointment_id)) map.set(row.appointment_id, []);
+      map.get(row.appointment_id)!.push({ id: row.id, name: row.name, price: row.price, estimatedDuration: row.estimated_duration, category: row.category });
+    }
+    return map;
+  })() : new Map<number, any[]>();
+
+  const data = appointments.map((a: any) => {
+    const services = svcMap.get(a.id) || [];
+    return {
+      id: a.id, customerId: a.customer_id, vehicleId: a.vehicle_id,
+      serviceIds: services.map((s: any) => s.id),
+      appointmentDate: a.appointment_date, status: a.status, discount: a.discount ?? 0,
+      finalPrice: a.final_price, observations: a.observations, createdAt: a.created_at,
+      customer: a.cid ? { id: a.cid, name: a.cname } : undefined,
+      vehicle: a.vid ? { id: a.vid, customerId: a.customer_id, brand: a.brand, model: a.model, plate: a.plate } : undefined,
+      services,
+    };
+  });
   res.json({ data, meta: { total: data.length, page: 1, limit: data.length, totalPages: 1 } });
 });
 
@@ -108,16 +137,6 @@ router.get("/:id/loyalty", (req, res) => {
   res.json(mapLoyalty(loyalty, customer));
 });
 
-function mapAppointmentDetail(a: any) {
-  return {
-    id: a.id, customerId: a.customer_id, vehicleId: a.vehicle_id, serviceId: a.service_id,
-    appointmentDate: a.appointment_date, status: a.status, discount: a.discount, finalPrice: a.final_price,
-    observations: a.observations, createdAt: a.created_at,
-    customer: a.cid ? { id: a.cid, name: a.cname } : undefined,
-    vehicle: a.vid ? { id: a.vid, customerId: a.customer_id, brand: a.brand, model: a.model, plate: a.plate } : undefined,
-    service: a.sid ? { id: a.sid, name: a.sname, price: a.sprice } : undefined,
-  };
-}
 
 function mapLoyalty(l: any, customer?: any) {
   return {

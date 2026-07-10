@@ -1973,8 +1973,10 @@ components:
           type: integer
         vehicleId:
           type: integer
-        serviceId:
-          type: integer
+        serviceIds:
+          type: array
+          items:
+            type: integer
         appointmentDate:
           type: string
           format: date-time
@@ -1984,12 +1986,15 @@ components:
           type: number
         finalPrice:
           type: number
+        totalDuration:
+          type: integer
+          description: Total estimated duration in minutes (sum of all services)
         observations:
           type: string
         createdAt:
           type: string
           format: date-time
-      required: [id, customerId, vehicleId, serviceId, appointmentDate, status, createdAt]
+      required: [id, customerId, vehicleId, serviceIds, appointmentDate, status, createdAt]
 
     AppointmentDetail:
       allOf:
@@ -2000,8 +2005,10 @@ components:
               $ref: "#/components/schemas/Customer"
             vehicle:
               $ref: "#/components/schemas/Vehicle"
-            service:
-              $ref: "#/components/schemas/Service"
+            services:
+              type: array
+              items:
+                $ref: "#/components/schemas/Service"
             orderService:
               $ref: "#/components/schemas/OrderService"
 
@@ -2012,8 +2019,11 @@ components:
           type: integer
         vehicleId:
           type: integer
-        serviceId:
-          type: integer
+        serviceIds:
+          type: array
+          items:
+            type: integer
+          minItems: 1
         appointmentDate:
           type: string
           format: date-time
@@ -2021,7 +2031,7 @@ components:
           type: number
         observations:
           type: string
-      required: [customerId, vehicleId, serviceId, appointmentDate]
+      required: [customerId, vehicleId, serviceIds, appointmentDate]
 
     UpdateAppointmentRequest:
       type: object
@@ -2030,8 +2040,11 @@ components:
           type: integer
         vehicleId:
           type: integer
-        serviceId:
-          type: integer
+        serviceIds:
+          type: array
+          items:
+            type: integer
+          minItems: 1
         appointmentDate:
           type: string
           format: date-time

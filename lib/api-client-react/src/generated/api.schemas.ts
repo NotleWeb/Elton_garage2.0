@@ -331,11 +331,13 @@ export interface Appointment {
   id: number;
   customerId: number;
   vehicleId: number;
-  serviceId: number;
+  serviceIds: number[];
   appointmentDate: string;
   status: AppointmentStatus;
   discount?: number;
   finalPrice?: number;
+  /** Total estimated duration in minutes (sum of all services) */
+  totalDuration?: number;
   observations?: string;
   createdAt: string;
 }
@@ -368,14 +370,15 @@ export interface OrderService {
 export type AppointmentDetail = Appointment & {
   customer?: Customer;
   vehicle?: Vehicle;
-  service?: Service;
+  services?: Service[];
   orderService?: OrderService;
 };
 
 export interface CreateAppointmentRequest {
   customerId: number;
   vehicleId: number;
-  serviceId: number;
+  /** @minItems 1 */
+  serviceIds: number[];
   appointmentDate: string;
   discount?: number;
   observations?: string;
@@ -384,7 +387,8 @@ export interface CreateAppointmentRequest {
 export interface UpdateAppointmentRequest {
   customerId?: number;
   vehicleId?: number;
-  serviceId?: number;
+  /** @minItems 1 */
+  serviceIds?: number[];
   appointmentDate?: string;
   status?: AppointmentStatus;
   discount?: number;

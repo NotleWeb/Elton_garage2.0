@@ -14,6 +14,6 @@ import type { Vehicle } from './vehicle';
 export type AppointmentDetail = Appointment & {
   customer?: Customer;
   vehicle?: Vehicle;
-  service?: Service;
+  services?: Service[];
   orderService?: OrderService;
 };

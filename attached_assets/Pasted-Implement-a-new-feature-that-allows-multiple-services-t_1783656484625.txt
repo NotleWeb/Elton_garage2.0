@@ -1,0 +1,271 @@
+Implement a new feature that allows multiple services to be selected in a single appointment.
+
+Before making any changes:
+
+- Analyze the entire project structure.
+- Identify all files related to appointments, services, pricing and database models.
+- Detect possible compatibility issues.
+- Fix any problems that could prevent this feature from working correctly.
+- Preserve all existing functionality.
+
+===========================================================
+NEW FEATURE
+===========================================================
+
+Currently, an appointment can only have one service.
+
+Modify the system so that one appointment can contain multiple services.
+
+Example:
+
+Appointment:
+
+Customer:
+João Silva
+
+Vehicle:
+Honda Civic
+
+Services:
+
+✓ Lavagem Premium
+✓ Higienização Interna
+✓ Polimento Comercial
+✓ Cristalização dos Vidros
+
+===========================================================
+DATABASE
+===========================================================
+
+Modify the database structure.
+
+Do NOT store service IDs in a single field.
+
+Create the proper many-to-many relationship.
+
+Example:
+
+Appointments
+
+AppointmentServices (junction table)
+
+Services
+
+Each appointment may contain multiple services.
+
+Each service may belong to multiple appointments.
+
+Generate all necessary migrations.
+
+Maintain database integrity.
+
+===========================================================
+BACKEND
+===========================================================
+
+Update all models.
+
+Update schemas.
+
+Update repositories.
+
+Update services.
+
+Update API endpoints.
+
+Appointments must now accept an array of service IDs.
+
+Example:
+
+{
+    "customer_id": 1,
+    "vehicle_id": 2,
+    "service_ids": [1,3,5,7]
+}
+
+===========================================================
+BUSINESS RULES
+===========================================================
+
+The system must automatically:
+
+Calculate the total appointment value.
+
+Sum the duration of every selected service.
+
+Store every selected service.
+
+Return the complete service list when reading an appointment.
+
+Generate correct financial values.
+
+Generate correct dashboard statistics.
+
+Keep inventory calculations compatible.
+
+===========================================================
+FRONTEND
+===========================================================
+
+Replace the current single service selector.
+
+Use a multi-select component.
+
+The user must be able to:
+
+✔ Search services
+
+✔ Select multiple services
+
+✔ Remove selected services
+
+✔ View selected services
+
+Display the selected services as chips/cards.
+
+Example:
+
+Lavagem Premium ✕
+
+Higienização ✕
+
+Polimento ✕
+
+===========================================================
+APPOINTMENT SUMMARY
+===========================================================
+
+As services are selected, automatically update:
+
+Total services
+
+Estimated duration
+
+Subtotal
+
+Discount
+
+Final value
+
+Example:
+
+Services:
+4
+
+Estimated time:
+6h30
+
+Subtotal:
+R$ 890,00
+
+Discount:
+R$ 50,00
+
+Total:
+R$ 840,00
+
+Update everything in real time.
+
+===========================================================
+APPOINTMENT DETAILS
+===========================================================
+
+When opening an appointment, display all services.
+
+Example:
+
+Serviços
+
+• Lavagem Premium
+
+• Higienização Interna
+
+• Polimento Comercial
+
+• Cristalização dos Vidros
+
+===========================================================
+EDIT APPOINTMENT
+===========================================================
+
+Allow adding new services.
+
+Allow removing services.
+
+Automatically recalculate values.
+
+===========================================================
+REPORTS
+===========================================================
+
+Reports must count every individual service.
+
+Example:
+
+One appointment contains:
+
+Lavagem
+
+Polimento
+
+Cristalização
+
+The reports should count:
+
+Lavagem = +1
+
+Polimento = +1
+
+Cristalização = +1
+
+===========================================================
+DASHBOARD
+===========================================================
+
+Update dashboard calculations.
+
+Most sold services
+
+Revenue
+
+Average ticket
+
+Hours worked
+
+Service statistics
+
+Everything must continue working correctly.
+
+===========================================================
+QUALITY
+===========================================================
+
+Do not remove existing features.
+
+Maintain current UI style.
+
+Use reusable components.
+
+Keep clean architecture.
+
+Avoid duplicated code.
+
+Update all validations.
+
+Update all tests if necessary.
+
+Fix any issues found during implementation.
+
+Ensure the project builds successfully without errors.
+
+Deliver production-ready code only.
+
+Do not generate TODOs or placeholder code.
+
+===========================================================
+IMPORTANT
+===========================================================
+
+All interface texts must remain in Brazilian Portuguese (pt-BR).
+
+The implementation must be fully compatible with the existing project.

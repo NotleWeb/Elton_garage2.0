@@ -3,9 +3,10 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
-import { initDb } from "./db.js";
+import { initDb, runMigrations } from "./db.js";
 
-// Initialize database on startup
+// Run migrations first (no-op on fresh DBs), then init schema + seed
+runMigrations();
 initDb();
 
 const app: Express = express();

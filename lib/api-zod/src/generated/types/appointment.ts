@@ -11,11 +11,13 @@ export interface Appointment {
   id: number;
   customerId: number;
   vehicleId: number;
-  serviceId: number;
+  serviceIds: number[];
   appointmentDate: Date;
   status: AppointmentStatus;
   discount?: number;
   finalPrice?: number;
+  /** Total estimated duration in minutes (sum of all services) */
+  totalDuration?: number;
   observations?: string;
   createdAt: Date;
 }

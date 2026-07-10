@@ -376,11 +376,12 @@ export const ListCustomerAppointmentsResponse = zod.object({
   "id": zod.number(),
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()),
   "appointmentDate": zod.coerce.date(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']),
   "discount": zod.number().optional(),
   "finalPrice": zod.number().optional(),
+  "totalDuration": zod.number().optional().describe('Total estimated duration in minutes (sum of all services)'),
   "observations": zod.string().optional(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -411,7 +412,7 @@ export const ListCustomerAppointmentsResponse = zod.object({
   "notes": zod.string().optional(),
   "customerName": zod.string().optional()
 }).optional(),
-  "service": zod.object({
+  "services": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().optional(),
@@ -420,7 +421,7 @@ export const ListCustomerAppointmentsResponse = zod.object({
   "category": zod.string().optional(),
   "vehicleType": zod.enum(['todos', 'hatch', 'sedan', 'suv', 'pickup', 'van', 'moto', 'caminhao']).optional(),
   "active": zod.boolean()
-}).optional(),
+})).optional(),
   "orderService": zod.object({
   "id": zod.number(),
   "appointmentId": zod.number(),
@@ -748,11 +749,12 @@ export const ListAppointmentsResponse = zod.object({
   "id": zod.number(),
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()),
   "appointmentDate": zod.coerce.date(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']),
   "discount": zod.number().optional(),
   "finalPrice": zod.number().optional(),
+  "totalDuration": zod.number().optional().describe('Total estimated duration in minutes (sum of all services)'),
   "observations": zod.string().optional(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -783,7 +785,7 @@ export const ListAppointmentsResponse = zod.object({
   "notes": zod.string().optional(),
   "customerName": zod.string().optional()
 }).optional(),
-  "service": zod.object({
+  "services": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().optional(),
@@ -792,7 +794,7 @@ export const ListAppointmentsResponse = zod.object({
   "category": zod.string().optional(),
   "vehicleType": zod.enum(['todos', 'hatch', 'sedan', 'suv', 'pickup', 'van', 'moto', 'caminhao']).optional(),
   "active": zod.boolean()
-}).optional(),
+})).optional(),
   "orderService": zod.object({
   "id": zod.number(),
   "appointmentId": zod.number(),
@@ -817,10 +819,13 @@ export const ListAppointmentsResponse = zod.object({
 /**
  * @summary Create appointment
  */
+
+
+
 export const CreateAppointmentBody = zod.object({
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()).min(1),
   "appointmentDate": zod.coerce.date(),
   "discount": zod.number().optional(),
   "observations": zod.string().optional()
@@ -830,11 +835,12 @@ export const CreateAppointmentResponse = zod.object({
   "id": zod.number(),
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()),
   "appointmentDate": zod.coerce.date(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']),
   "discount": zod.number().optional(),
   "finalPrice": zod.number().optional(),
+  "totalDuration": zod.number().optional().describe('Total estimated duration in minutes (sum of all services)'),
   "observations": zod.string().optional(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -865,7 +871,7 @@ export const CreateAppointmentResponse = zod.object({
   "notes": zod.string().optional(),
   "customerName": zod.string().optional()
 }).optional(),
-  "service": zod.object({
+  "services": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().optional(),
@@ -874,7 +880,7 @@ export const CreateAppointmentResponse = zod.object({
   "category": zod.string().optional(),
   "vehicleType": zod.enum(['todos', 'hatch', 'sedan', 'suv', 'pickup', 'van', 'moto', 'caminhao']).optional(),
   "active": zod.boolean()
-}).optional(),
+})).optional(),
   "orderService": zod.object({
   "id": zod.number(),
   "appointmentId": zod.number(),
@@ -900,11 +906,12 @@ export const GetAppointmentResponse = zod.object({
   "id": zod.number(),
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()),
   "appointmentDate": zod.coerce.date(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']),
   "discount": zod.number().optional(),
   "finalPrice": zod.number().optional(),
+  "totalDuration": zod.number().optional().describe('Total estimated duration in minutes (sum of all services)'),
   "observations": zod.string().optional(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -935,7 +942,7 @@ export const GetAppointmentResponse = zod.object({
   "notes": zod.string().optional(),
   "customerName": zod.string().optional()
 }).optional(),
-  "service": zod.object({
+  "services": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().optional(),
@@ -944,7 +951,7 @@ export const GetAppointmentResponse = zod.object({
   "category": zod.string().optional(),
   "vehicleType": zod.enum(['todos', 'hatch', 'sedan', 'suv', 'pickup', 'van', 'moto', 'caminhao']).optional(),
   "active": zod.boolean()
-}).optional(),
+})).optional(),
   "orderService": zod.object({
   "id": zod.number(),
   "appointmentId": zod.number(),
@@ -966,10 +973,13 @@ export const UpdateAppointmentParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const UpdateAppointmentBody = zod.object({
   "customerId": zod.number().optional(),
   "vehicleId": zod.number().optional(),
-  "serviceId": zod.number().optional(),
+  "serviceIds": zod.array(zod.number()).min(1).optional(),
   "appointmentDate": zod.coerce.date().optional(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']).optional(),
   "discount": zod.number().optional(),
@@ -981,11 +991,12 @@ export const UpdateAppointmentResponse = zod.object({
   "id": zod.number(),
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()),
   "appointmentDate": zod.coerce.date(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']),
   "discount": zod.number().optional(),
   "finalPrice": zod.number().optional(),
+  "totalDuration": zod.number().optional().describe('Total estimated duration in minutes (sum of all services)'),
   "observations": zod.string().optional(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -1016,7 +1027,7 @@ export const UpdateAppointmentResponse = zod.object({
   "notes": zod.string().optional(),
   "customerName": zod.string().optional()
 }).optional(),
-  "service": zod.object({
+  "services": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().optional(),
@@ -1025,7 +1036,7 @@ export const UpdateAppointmentResponse = zod.object({
   "category": zod.string().optional(),
   "vehicleType": zod.enum(['todos', 'hatch', 'sedan', 'suv', 'pickup', 'van', 'moto', 'caminhao']).optional(),
   "active": zod.boolean()
-}).optional(),
+})).optional(),
   "orderService": zod.object({
   "id": zod.number(),
   "appointmentId": zod.number(),
@@ -1067,11 +1078,12 @@ export const UpdateAppointmentStatusResponse = zod.object({
   "id": zod.number(),
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()),
   "appointmentDate": zod.coerce.date(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']),
   "discount": zod.number().optional(),
   "finalPrice": zod.number().optional(),
+  "totalDuration": zod.number().optional().describe('Total estimated duration in minutes (sum of all services)'),
   "observations": zod.string().optional(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -1102,7 +1114,7 @@ export const UpdateAppointmentStatusResponse = zod.object({
   "notes": zod.string().optional(),
   "customerName": zod.string().optional()
 }).optional(),
-  "service": zod.object({
+  "services": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().optional(),
@@ -1111,7 +1123,7 @@ export const UpdateAppointmentStatusResponse = zod.object({
   "category": zod.string().optional(),
   "vehicleType": zod.enum(['todos', 'hatch', 'sedan', 'suv', 'pickup', 'van', 'moto', 'caminhao']).optional(),
   "active": zod.boolean()
-}).optional(),
+})).optional(),
   "orderService": zod.object({
   "id": zod.number(),
   "appointmentId": zod.number(),
@@ -2039,11 +2051,12 @@ export const GetUpcomingAppointmentsResponseItem = zod.object({
   "id": zod.number(),
   "customerId": zod.number(),
   "vehicleId": zod.number(),
-  "serviceId": zod.number(),
+  "serviceIds": zod.array(zod.number()),
   "appointmentDate": zod.coerce.date(),
   "status": zod.enum(['agendado', 'confirmado', 'em_andamento', 'concluido', 'cancelado']),
   "discount": zod.number().optional(),
   "finalPrice": zod.number().optional(),
+  "totalDuration": zod.number().optional().describe('Total estimated duration in minutes (sum of all services)'),
   "observations": zod.string().optional(),
   "createdAt": zod.coerce.date()
 }).and(zod.object({
@@ -2074,7 +2087,7 @@ export const GetUpcomingAppointmentsResponseItem = zod.object({
   "notes": zod.string().optional(),
   "customerName": zod.string().optional()
 }).optional(),
-  "service": zod.object({
+  "services": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().optional(),
@@ -2083,7 +2096,7 @@ export const GetUpcomingAppointmentsResponseItem = zod.object({
   "category": zod.string().optional(),
   "vehicleType": zod.enum(['todos', 'hatch', 'sedan', 'suv', 'pickup', 'van', 'moto', 'caminhao']).optional(),
   "active": zod.boolean()
-}).optional(),
+})).optional(),
   "orderService": zod.object({
   "id": zod.number(),
   "appointmentId": zod.number(),

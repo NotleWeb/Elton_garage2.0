@@ -9,7 +9,8 @@
 export interface CreateAppointmentRequest {
   customerId: number;
   vehicleId: number;
-  serviceId: number;
+  /** @minItems 1 */
+  serviceIds: number[];
   appointmentDate: Date;
   discount?: number;
   observations?: string;

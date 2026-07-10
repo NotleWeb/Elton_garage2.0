@@ -10,7 +10,8 @@ import type { AppointmentStatus } from './appointmentStatus';
 export interface UpdateAppointmentRequest {
   customerId?: number;
   vehicleId?: number;
-  serviceId?: number;
+  /** @minItems 1 */
+  serviceIds?: number[];
   appointmentDate?: Date;
   status?: AppointmentStatus;
   discount?: number;

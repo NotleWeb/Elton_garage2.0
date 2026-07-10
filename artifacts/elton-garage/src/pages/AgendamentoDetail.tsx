@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { 
-  useGetAppointment, useUpdateAppointmentStatus, 
+import {
+  useGetAppointment, useUpdateAppointmentStatus,
   useGetOrderService, useCreateOrderService, useUpdateOrderService,
   useListProductUsage, useCreateProductUsage, useDeleteProductUsage,
   getGetAppointmentQueryKey, getGetOrderServiceQueryKey, getListProductUsageQueryKey,
@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Loader2, CheckCircle2, User, Car, Wrench, Package, Trash2, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle2, User, Car, Wrench, Package, Trash2, Plus, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -36,12 +36,19 @@ const STATUS_LABELS: Record<string, string> = {
   agendado: 'Agendado', confirmado: 'Confirmado', em_andamento: 'Em andamento', concluido: 'Concluído', cancelado: 'Cancelado'
 };
 
+function formatDuration(minutes: number): string {
+  if (!minutes) return '';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return [h > 0 ? `${h}h` : '', m > 0 ? `${m}min` : ''].filter(Boolean).join(' ');
+}
+
 export default function AgendamentoDetail({ params }: { params: { id: string } }) {
   const id = parseInt(params.id);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const [productToAdd, setProductToAdd] = useState<string>('');
   const [quantityToAdd, setQuantityToAdd] = useState<number>(1);
 
@@ -78,7 +85,6 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
   const onOsSubmit = (values: OsForm) => {
     const payload = { id, data: values };
     const mutation = os ? updateOsMutation : createOsMutation;
-    
     mutation.mutate(payload as any, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetOrderServiceQueryKey(id) });
@@ -113,6 +119,11 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
   if (!appointment) return <div className="p-8 text-center text-muted-foreground">Agendamento não encontrado.</div>;
 
   const currentStepIdx = STEPS.indexOf(appointment.status);
+  // Services come from the multi-service API
+  const aptServices: any[] = (appointment as any).services || [];
+  const subtotal = aptServices.reduce((s: number, sv: any) => s + (sv.price || 0), 0);
+  const discount = appointment.discount ?? 0;
+  const totalDuration = (appointment as any).totalDuration || aptServices.reduce((s: number, sv: any) => s + (sv.estimatedDuration || 0), 0);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
@@ -128,8 +139,8 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
           {appointment.status === 'cancelado' ? (
             <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20 text-sm px-3 py-1">Cancelado</Badge>
           ) : (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="text-red-500 hover:text-red-600 hover:bg-red-500/10 border-red-500/20"
               onClick={() => handleStatusChange('cancelado')}
             >
@@ -144,14 +155,14 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
           <CardContent className="p-6">
             <div className="flex justify-between items-center relative">
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-secondary -z-10 rounded"></div>
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary -z-10 rounded transition-all duration-500" 
-                   style={{ width: `${(Math.max(0, currentStepIdx) / (STEPS.length - 1)) * 100}%` }}></div>
-              
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary -z-10 rounded transition-all duration-500"
+                style={{ width: `${(Math.max(0, currentStepIdx) / (STEPS.length - 1)) * 100}%` }}></div>
+
               {STEPS.map((step, idx) => {
                 const isCompleted = currentStepIdx >= idx;
                 const isCurrent = currentStepIdx === idx;
                 return (
-                  <button 
+                  <button
                     key={step}
                     onClick={() => handleStatusChange(step)}
                     className="flex flex-col items-center gap-2 focus:outline-none group"
@@ -172,17 +183,19 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Cliente */}
         <Card className="border-border shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Cliente</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="font-semibold text-foreground text-lg">{appointment.customer?.name}</p>
-            <p className="text-sm text-muted-foreground">{appointment.customer?.whatsapp || appointment.customer?.phone || 'Sem telefone'}</p>
+            <p className="text-sm text-muted-foreground">{(appointment.customer as any)?.whatsapp || appointment.customer?.phone || 'Sem telefone'}</p>
             <p className="text-sm text-muted-foreground mt-1">{appointment.customer?.email}</p>
           </CardContent>
         </Card>
 
+        {/* Veículo */}
         <Card className="border-border shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2"><Car className="w-5 h-5 text-primary" /> Veículo</CardTitle>
@@ -194,26 +207,64 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
           </CardContent>
         </Card>
 
+        {/* Serviços */}
         <Card className="border-border shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2"><Wrench className="w-5 h-5 text-primary" /> Serviço</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-primary" /> Serviços
+              {aptServices.length > 0 && (
+                <Badge variant="secondary" className="ml-auto text-xs">{aptServices.length}</Badge>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-semibold text-foreground text-lg">{appointment.service?.name}</p>
-            <div className="flex justify-between items-center mt-2">
-              <span className="text-sm text-muted-foreground">Preço base:</span>
-              <span className="text-sm">{formatCurrency(appointment.service?.price || 0)}</span>
-            </div>
-            {(appointment.discount ?? 0) > 0 && (
-              <div className="flex justify-between items-center text-emerald-500">
-                <span className="text-sm">Desconto:</span>
-                <span className="text-sm">-{formatCurrency(appointment.discount ?? 0)}</span>
+            {aptServices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum serviço vinculado.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {aptServices.map((svc: any) => (
+                  <div key={svc.id} className="flex justify-between items-center text-sm">
+                    <div className="flex flex-col min-w-0 flex-1 mr-2">
+                      <span className="font-medium text-foreground truncate">{svc.name}</span>
+                      {svc.estimatedDuration > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />{formatDuration(svc.estimatedDuration)}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground shrink-0">{formatCurrency(svc.price)}</span>
+                  </div>
+                ))}
               </div>
             )}
-            <div className="flex justify-between items-center mt-2 pt-2 border-t border-border">
-              <span className="font-semibold text-foreground">Total:</span>
-              <span className="font-bold text-primary text-lg">{formatCurrency(appointment.finalPrice || appointment.service?.price || 0)}</span>
-            </div>
+
+            {/* Totals */}
+            {aptServices.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border space-y-1">
+                {aptServices.length > 1 && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                )}
+                {discount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-500">
+                    <span>Desconto:</span>
+                    <span>-{formatCurrency(discount)}</span>
+                  </div>
+                )}
+                {totalDuration > 0 && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Tempo total:</span>
+                    <span>{formatDuration(totalDuration)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-1 border-t border-border">
+                  <span className="font-semibold text-foreground">Total:</span>
+                  <span className="font-bold text-primary text-lg">{formatCurrency(appointment.finalPrice || 0)}</span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -223,7 +274,7 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
           <TabsTrigger value="os" className="data-[state=active]:bg-card data-[state=active]:text-primary">Ordem de Serviço</TabsTrigger>
           <TabsTrigger value="produtos" className="data-[state=active]:bg-card data-[state=active]:text-primary">Produtos Utilizados</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="os" className="mt-4">
           <Card className="border-border">
             <CardHeader>
@@ -278,7 +329,7 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="produtos" className="mt-4">
           <Card className="border-border">
             <CardHeader>
@@ -313,20 +364,20 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
                   <div className="col-span-2 text-center">Ação</div>
                 </div>
                 <div className="divide-y divide-border">
-                  {!usages?.length ? (
+                  {!productUsages?.length ? (
                     <div className="p-8 text-center text-muted-foreground flex flex-col items-center">
                       <Package className="w-8 h-8 mb-2 opacity-50" />
                       Nenhum produto registrado nesta O.S.
                     </div>
                   ) : (
-                    usages.map((u) => (
+                    productUsages.map((u) => (
                       <div key={u.id} className="grid grid-cols-12 gap-4 p-3 items-center">
                         <div className="col-span-6 font-medium">{u.product?.name}</div>
                         <div className="col-span-4 text-right">{u.quantity} {u.product?.unit}</div>
                         <div className="col-span-2 flex justify-center">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
                             onClick={() => {
                               delProductMutation.mutate({ id: u.id }, {

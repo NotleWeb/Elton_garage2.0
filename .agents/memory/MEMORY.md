@@ -1,0 +1,1 @@
+- [Multi-service appointments schema](multi-service-appointments.md) — junction table appointment_services replaced service_id; migration via PRAGMA foreign_keys OFF outside any transaction.
