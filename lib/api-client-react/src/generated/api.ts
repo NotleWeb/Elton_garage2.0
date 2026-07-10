@@ -5590,3 +5590,108 @@ export const useRestoreBackup = <TError = ErrorType<unknown>,
       return useMutation(getRestoreBackupMutationOptions(options));
     }
 
+
+// ---------------------------------------------------------------------------
+// Delete notification
+// ---------------------------------------------------------------------------
+
+export const getDeleteNotificationUrl = (id: number) => `/api/notifications/${id}`;
+
+export const deleteNotification = async (id: number, options?: RequestInit): Promise<MessageResponse> => {
+  return customFetch<MessageResponse>(getDeleteNotificationUrl(id), { ...options, method: 'DELETE' });
+};
+
+export const getDeleteNotificationMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteNotification>>, TError, { id: number }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteNotification>>, TError, { id: number }, TContext> => {
+  const mutationKey = ['deleteNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteNotification>>, { id: number }> = (props) => {
+    const { id } = props ?? {};
+    return deleteNotification(id, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteNotification>>>;
+export type DeleteNotificationMutationError = ErrorType<unknown>;
+
+export const useDeleteNotification = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteNotification>>, TError, { id: number }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationResult<Awaited<ReturnType<typeof deleteNotification>>, TError, { id: number }, TContext> => {
+  return useMutation(getDeleteNotificationMutationOptions(options));
+};
+
+// ---------------------------------------------------------------------------
+// Complete notification
+// ---------------------------------------------------------------------------
+
+export const getCompleteNotificationUrl = (id: number) => `/api/notifications/${id}/complete`;
+
+export const completeNotification = async (id: number, options?: RequestInit): Promise<Notification> => {
+  return customFetch<Notification>(getCompleteNotificationUrl(id), { ...options, method: 'PATCH' });
+};
+
+export const getCompleteNotificationMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof completeNotification>>, TError, { id: number }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof completeNotification>>, TError, { id: number }, TContext> => {
+  const mutationKey = ['completeNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeNotification>>, { id: number }> = (props) => {
+    const { id } = props ?? {};
+    return completeNotification(id, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CompleteNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof completeNotification>>>;
+export type CompleteNotificationMutationError = ErrorType<unknown>;
+
+export const useCompleteNotification = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof completeNotification>>, TError, { id: number }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationResult<Awaited<ReturnType<typeof completeNotification>>, TError, { id: number }, TContext> => {
+  return useMutation(getCompleteNotificationMutationOptions(options));
+};
+
+// ---------------------------------------------------------------------------
+// Archive notification
+// ---------------------------------------------------------------------------
+
+export const getArchiveNotificationUrl = (id: number) => `/api/notifications/${id}/archive`;
+
+export const archiveNotification = async (id: number, options?: RequestInit): Promise<MessageResponse> => {
+  return customFetch<MessageResponse>(getArchiveNotificationUrl(id), { ...options, method: 'PATCH' });
+};
+
+export const getArchiveNotificationMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof archiveNotification>>, TError, { id: number }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof archiveNotification>>, TError, { id: number }, TContext> => {
+  const mutationKey = ['archiveNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof archiveNotification>>, { id: number }> = (props) => {
+    const { id } = props ?? {};
+    return archiveNotification(id, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof archiveNotification>>>;
+export type ArchiveNotificationMutationError = ErrorType<unknown>;
+
+export const useArchiveNotification = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof archiveNotification>>, TError, { id: number }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationResult<Awaited<ReturnType<typeof archiveNotification>>, TError, { id: number }, TContext> => {
+  return useMutation(getArchiveNotificationMutationOptions(options));
+};

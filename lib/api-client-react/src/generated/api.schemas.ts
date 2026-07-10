@@ -647,21 +647,36 @@ export type NotificationType = typeof NotificationType[keyof typeof Notification
 
 
 export const NotificationType = {
+  appointment_reminder: 'appointment_reminder',
+  feedback: 'feedback',
+  maintenance: 'maintenance',
+  return: 'return',
+  service_completed: 'service_completed',
+  system: 'system',
+  inventory: 'inventory',
+  financial: 'financial',
+  // Legacy values kept for backwards compatibility
   reminder_1d: 'reminder_1d',
   reminder_15d: 'reminder_15d',
   reminder_30d: 'reminder_30d',
   reminder_45d: 'reminder_45d',
   loyalty: 'loyalty',
-  system: 'system',
 } as const;
 
 export interface Notification {
   id: number;
   customerId?: number;
+  appointmentId?: number;
   title: string;
   message: string;
   type: NotificationType;
+  subtype?: string;
   read: boolean;
+  readAt?: string;
+  completed: boolean;
+  completedAt?: string;
+  archived: boolean;
+  scheduledFor?: string;
   createdAt: string;
   customer?: Customer;
 }
@@ -902,6 +917,10 @@ export type ListNotificationsParams = {
 page?: PageParamParameter;
 limit?: LimitParamParameter;
 read?: boolean;
+type?: string;
+customerId?: number;
+dateFrom?: string;
+dateTo?: string;
 };
 
 export type ListFeedbackParams = {

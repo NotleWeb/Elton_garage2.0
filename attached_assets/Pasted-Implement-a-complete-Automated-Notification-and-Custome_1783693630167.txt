@@ -1,0 +1,423 @@
+Implement a complete Automated Notification and Customer Follow-up System for the existing Elton Garage project.
+
+IMPORTANT
+
+The project currently uses Firebase Firestore as the database.
+
+The implementation MUST be fully compatible with Firebase Firestore.
+
+Before making any changes:
+
+- Analyze the entire project.
+- Understand the current appointment flow.
+- Understand the notification system.
+- Detect possible inconsistencies.
+- Fix any issue before implementing the new feature.
+- Preserve every existing functionality.
+- Do not break any module.
+
+=========================================================
+OBJECTIVE
+=========================================================
+
+Create an intelligent notification system responsible for:
+
+• Appointment reminders
+
+• Customer feedback reminders
+
+• Customer maintenance reminders
+
+• Customer return reminders
+
+Everything must happen automatically based on dates and times stored in Firestore.
+
+=========================================================
+DATABASE
+=========================================================
+
+Use Firebase Firestore.
+
+Do not replace Firestore.
+
+Do not use browser LocalStorage.
+
+Do not store notification states in memory.
+
+Persist everything inside Firestore.
+
+Create collections if necessary.
+
+Example:
+
+notifications
+
+notificationLogs
+
+scheduledJobs
+
+=========================================================
+AUTOMATIC APPOINTMENT REMINDERS
+=========================================================
+
+Every scheduled appointment must automatically generate reminders.
+
+Default reminder:
+
+1 hour before the scheduled appointment.
+
+Example
+
+Appointment
+
+13:00
+
+↓
+
+Notification generated at
+
+12:00
+
+Another example
+
+Appointment
+
+08:30
+
+↓
+
+Notification generated at
+
+07:30
+
+This rule must work for every appointment.
+
+=========================================================
+NOTIFICATION CONTENT
+=========================================================
+
+Example
+
+Agendamento em breve
+
+O cliente João Silva possui um atendimento agendado para hoje às 13:00.
+
+Serviços:
+
+• Lavagem Premium
+
+• Higienização
+
+Veículo:
+
+Honda Civic
+
+Placa:
+
+ABC-1234
+
+=========================================================
+REMINDER DELIVERY
+=========================================================
+
+Initially, reminders only need to appear inside the system.
+
+Future compatibility must be maintained for:
+
+Firebase Cloud Messaging
+
+WhatsApp API
+
+Email
+
+SMS
+
+Do not implement external integrations now.
+
+Only prepare the architecture.
+
+=========================================================
+CUSTOMER FOLLOW-UP SYSTEM
+=========================================================
+
+The system must monitor completed appointments.
+
+Always use the latest completed appointment of each customer.
+
+Based on the completion date, automatically generate reminders.
+
+=========================================================
+1 DAY AFTER COMPLETION
+=========================================================
+
+Generate a reminder.
+
+Title
+
+Solicitar feedback
+
+Example
+
+Entre em contato com João Silva e solicite um feedback sobre o atendimento realizado.
+
+=========================================================
+15 DAYS AFTER COMPLETION
+=========================================================
+
+Generate reminder.
+
+Title
+
+Lavagem de manutenção
+
+Example
+
+João Silva realizou o último serviço há 15 dias.
+
+Considere oferecer uma lavagem de manutenção.
+
+=========================================================
+30 DAYS AFTER COMPLETION
+=========================================================
+
+Generate reminder.
+
+Title
+
+Trazer cliente de volta
+
+Example
+
+João Silva está há mais de 30 dias sem retornar.
+
+Considere enviar uma promoção ou realizar contato para um novo agendamento.
+
+=========================================================
+NOTIFICATION CENTER
+=========================================================
+
+Create a Notification Center.
+
+Sidebar
+
+Notificações
+
+Display:
+
+Unread notifications
+
+Read notifications
+
+Filter by type
+
+Filter by date
+
+Filter by customer
+
+Order by newest
+
+=========================================================
+NOTIFICATION TYPES
+=========================================================
+
+Appointment Reminder
+
+Customer Feedback
+
+Maintenance Reminder
+
+Customer Return
+
+System Notification
+
+Inventory Alert
+
+Financial Alert
+
+=========================================================
+NOTIFICATION STATUS
+=========================================================
+
+Each notification must contain:
+
+id
+
+title
+
+description
+
+type
+
+customerId
+
+appointmentId
+
+createdAt
+
+scheduledFor
+
+read
+
+readAt
+
+completed
+
+completedAt
+
+=========================================================
+MARK AS COMPLETED
+=========================================================
+
+Allow the user to:
+
+Mark reminder as completed.
+
+Mark as read.
+
+Delete notification.
+
+Archive notification.
+
+=========================================================
+AUTOMATIC EXECUTION
+=========================================================
+
+The reminder system must work automatically.
+
+Do NOT depend on a user opening the application.
+
+Use a scheduled background process compatible with Firebase.
+
+Recommended architecture:
+
+Firebase Cloud Functions
+
++
+
+Cloud Scheduler
+
+The scheduler must periodically check Firestore for appointments and completed services that require reminders.
+
+=========================================================
+DUPLICATE PROTECTION
+=========================================================
+
+Never generate duplicate reminders.
+
+Before creating a notification:
+
+Verify whether a reminder already exists for:
+
+Appointment reminder
+
+Feedback reminder
+
+15-day reminder
+
+30-day reminder
+
+=========================================================
+BUSINESS RULES
+=========================================================
+
+Appointment reminder
+
+↓
+
+Exactly 1 hour before the appointment.
+
+Feedback reminder
+
+↓
+
+Exactly 1 day after appointment completion.
+
+Maintenance reminder
+
+↓
+
+Exactly 15 days after completion.
+
+Return reminder
+
+↓
+
+Exactly 30 days after completion.
+
+Only generate reminders for completed appointments.
+
+Cancelled appointments must never generate follow-up reminders.
+
+=========================================================
+USER INTERFACE
+=========================================================
+
+Create a modern Notification Center.
+
+Display icons according to reminder type.
+
+Example
+
+🔔 Agendamento
+
+⭐ Feedback
+
+🚗 Lavagem de manutenção
+
+🎯 Retorno do cliente
+
+Display relative dates.
+
+Example
+
+Agora
+
+Há 2 horas
+
+Há 1 dia
+
+Há 15 dias
+
+=========================================================
+PERFORMANCE
+=========================================================
+
+Optimize Firestore queries.
+
+Avoid unnecessary reads.
+
+Create indexes when necessary.
+
+Avoid duplicate writes.
+
+Use batch operations whenever possible.
+
+=========================================================
+CODE QUALITY
+=========================================================
+
+Use reusable services.
+
+Separate business logic.
+
+Keep notification logic isolated.
+
+Follow Clean Architecture.
+
+Follow SOLID.
+
+Do not duplicate code.
+
+Do not create placeholder code.
+
+Do not generate TODO comments.
+
+=========================================================
+IMPORTANT
+=========================================================
+
+All user interface texts must be written in Brazilian Portuguese (pt-BR).
+
+Source code, variables and comments must remain in English.
+
+The implementation must be production-ready and fully compatible with Firebase Firestore.

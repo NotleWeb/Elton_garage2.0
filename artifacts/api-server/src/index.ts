@@ -1,5 +1,6 @@
 import app from "./app";
 import { initDb } from "./db";
+import { startScheduler } from "./services/scheduler.service";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -12,6 +13,7 @@ initDb()
     app.listen(port, (err?: Error) => {
       if (err) { logger.error({ err }, "Error listening on port"); process.exit(1); }
       logger.info({ port }, "Server listening");
+      startScheduler();
     });
   })
   .catch((err) => {

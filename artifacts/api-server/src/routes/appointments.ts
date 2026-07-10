@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { scheduleAppointmentReminder, scheduleFollowUpReminders } from "../services/notification.service.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -110,8 +112,41 @@ router.post("/", async (req, res) => {
     }
     await batch.commit();
   }
+
+  // Schedule appointment reminder (1 hour before) — non-blocking
+  scheduleAppointmentReminderForApt(apt.id, customerId, vehicleId, serviceIds ?? [], appointmentDate)
+    .catch((err) => logger.error({ err }, "Failed to schedule appointment reminder"));
+
   res.status(201).json(await loadAppointmentDetail(apt));
 });
+
+async function scheduleAppointmentReminderForApt(
+  appointmentId: number,
+  customerId: number,
+  vehicleId: number,
+  serviceIds: any[],
+  appointmentDate: string,
+): Promise<void> {
+  const [customer, vehicle, services] = await Promise.all([
+    getById("customers", Number(customerId)),
+    getById("vehicles", Number(vehicleId)),
+    Promise.all(serviceIds.map((sid) => getById("services", Number(sid)))),
+  ]) as [any, any, any[]];
+
+  const validServices = services.filter(Boolean) as any[];
+  const vehicleInfo = vehicle ? `${vehicle.brand} ${vehicle.model}` : "";
+  const plate = vehicle?.plate ?? "";
+
+  await scheduleAppointmentReminder({
+    appointmentId,
+    appointmentDate,
+    customerId: Number(customerId),
+    customerName: customer?.name ?? "",
+    vehicleInfo,
+    plate,
+    serviceNames: validServices.map((s) => s.name),
+  });
+}
 
 // ── PUT /appointments/:id ─────────────────────────────────────────────────────
 
@@ -130,6 +165,7 @@ router.put("/:id", async (req, res) => {
     discount: discount !== undefined ? Number(discount) : apt.discount,
     final_price: finalPrice !== undefined ? Number(finalPrice) : apt.final_price,
     observations: observations ?? apt.observations,
+    updated_at: nowIso(),
   });
 
   // Update service IDs atomically if provided
@@ -160,9 +196,8 @@ router.put("/:id", async (req, res) => {
     const svcNames = validSvcs.map((s) => s.name).join(", ");
     const custName = customer?.name ?? "";
 
-    // Use Firestore transaction for customer update + financial transaction atomicity
+    // Atomic: financial transaction + customer totals
     await db.runTransaction(async (t) => {
-      // Financial transaction
       const txRef = db.collection("financial_transactions").doc();
       t.set(txRef, {
         type: "receita", category: "Servicos",
@@ -171,7 +206,6 @@ router.put("/:id", async (req, res) => {
         payment_method: paymentMethod ?? null, created_at: nowIso(),
       });
 
-      // Update customer totals
       if (customer) {
         const custRef = db.collection("customers").doc(String(customer.id));
         t.update(custRef, {
@@ -182,7 +216,7 @@ router.put("/:id", async (req, res) => {
       }
     });
 
-    // Update loyalty card (separate — uses its own transaction in nextId)
+    // Update loyalty card
     const isWash = validSvcs.some((s: any) => s?.category === "Lavagem");
     if (isWash && customer) {
       const lSnap = await db.collection("loyalty_cards").where("customer_id", "==", updated.customer_id).limit(1).get();
@@ -205,19 +239,36 @@ router.put("/:id", async (req, res) => {
       }
     }
 
-    // Notification
+    // Service-completed notification (immediate, no schedule)
     await createDoc("notifications", {
       customer_id: updated.customer_id,
+      appointment_id: id,
       title: "Servico Concluido",
-      message: `Ola ${custName}! Seu servico (${svcNames}) foi concluido. Obrigado pela preferencia!`,
-      type: "service_completed", read: 0, created_at: nowIso(),
+      message: `Servico de ${custName} (${svcNames}) concluido com sucesso.`,
+      type: "service_completed",
+      subtype: null,
+      scheduled_for: null,
+      read: 0,
+      read_at: null,
+      completed: 0,
+      completed_at: null,
+      archived: 0,
+      created_at: nowIso(),
     });
+
+    // Schedule follow-up reminders — non-blocking
+    scheduleFollowUpReminders({
+      appointmentId: id,
+      customerId: updated.customer_id,
+      customerName: custName,
+      completionDate: nowIso(),
+    }).catch((err) => logger.error({ err }, "Failed to schedule follow-up reminders"));
   }
 
   res.json(await loadAppointmentDetail(await getById("appointments", id)));
 });
 
-// ── DELETE /appointments/:id — cleans up all child records ───────────────────
+// ── DELETE /appointments/:id ──────────────────────────────────────────────────
 
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
@@ -226,14 +277,12 @@ router.delete("/:id", async (req, res) => {
     return;
   }
 
-  // Gather all child collections
   const [aptSvcs, orderSvcs, productUsages] = await Promise.all([
     db.collection("appointment_services").where("appointment_id", "==", id).get(),
     db.collection("order_services").where("appointment_id", "==", id).get(),
     db.collection("product_usage").where("appointment_id", "==", id).get(),
   ]);
 
-  // Restore stock for any product usage before deleting
   for (const doc of productUsages.docs) {
     const u = doc.data() as any;
     const product = await getById("products", u.product_id) as any;
@@ -242,7 +291,6 @@ router.delete("/:id", async (req, res) => {
     }
   }
 
-  // Batch-delete everything
   const batch = db.batch();
   aptSvcs.docs.forEach((d) => batch.delete(d.ref));
   orderSvcs.docs.forEach((d) => batch.delete(d.ref));

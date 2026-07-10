@@ -340,7 +340,7 @@ export default function ClienteDetail({ params }: { params: { id: string } }) {
                         />
                         <div className="bg-secondary/30 p-4 rounded-lg border border-border">
                           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                            <h4 className="font-semibold text-foreground">{apt.service?.name || 'Serviço'}</h4>
+                            <h4 className="font-semibold text-foreground">{apt.services?.[0]?.name || 'Serviço'}</h4>
                             <Badge variant="outline" className={
                               apt.status === 'concluido' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
                               apt.status === 'cancelado' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
