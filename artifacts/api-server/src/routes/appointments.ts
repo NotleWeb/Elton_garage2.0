@@ -1,248 +1,256 @@
 import { Router } from "express";
-import { db } from "../db.js";
+import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router();
 router.use(authMiddleware);
 
-async function loadServicesMap(appointmentIds: number[]): Promise<Map<number, any[]>> {
-  if (!appointmentIds.length) return new Map();
-  const rows = await db.all(`
-    SELECT aps.appointment_id, s.id, s.name, s.price, s.estimated_duration, s.category, s.description, s.vehicle_type, s.active
-    FROM appointment_services aps
-    JOIN services s ON s.id = aps.service_id
-    WHERE aps.appointment_id = ANY($1::int[])
-    ORDER BY aps.id
-  `, [appointmentIds]) as any[];
-  const map = new Map<number, any[]>();
-  for (const row of rows) {
-    if (!map.has(row.appointment_id)) map.set(row.appointment_id, []);
-    map.get(row.appointment_id)!.push({
-      id: row.id, name: row.name, price: Number(row.price),
-      estimatedDuration: row.estimated_duration, category: row.category,
-      description: row.description, vehicleType: row.vehicle_type, active: !!row.active,
-    });
-  }
-  return map;
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function mapServiceRow(s: any) {
+  return {
+    id: s.id, name: s.name, price: Number(s.price),
+    estimatedDuration: s.estimated_duration, category: s.category,
+    description: s.description, vehicleType: s.vehicle_type, active: !!s.active,
+  };
 }
 
-function mapAppointmentDetail(a: any, services: any[]) {
-  const totalDuration = services.reduce((s, sv) => s + (sv.estimatedDuration || 0), 0);
-  const orderService = a.os_id ? {
-    id: a.os_id, appointmentId: a.id,
-    beforePhotos: JSON.parse(a.os_before || "[]"), afterPhotos: JSON.parse(a.os_after || "[]"),
-    checklist: JSON.parse(a.os_checklist || "{}"), observations: a.os_obs,
-    paymentMethod: a.os_payment, technician: a.os_technician, signature: a.os_signature,
-  } : undefined;
+async function loadAppointmentDetail(apt: any) {
+  const [customer, vehicle, aptSvcSnap] = await Promise.all([
+    getById("customers", apt.customer_id),
+    getById("vehicles", apt.vehicle_id),
+    db.collection("appointment_services").where("appointment_id", "==", apt.id).get(),
+  ]);
+  const serviceIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
+  const services = await Promise.all(serviceIds.map((sid) => getById("services", sid)));
+  const validServices = services.filter(Boolean) as any[];
+  const totalDuration = validServices.reduce((s, sv) => s + (sv?.estimated_duration ?? 0), 0);
+
+  const osSnap = await db.collection("order_services").where("appointment_id", "==", apt.id).limit(1).get();
+  let orderService: any;
+  if (!osSnap.empty) {
+    const os = { id: Number(osSnap.docs[0].id), ...osSnap.docs[0].data() } as any;
+    orderService = {
+      id: os.id, appointmentId: os.appointment_id,
+      beforePhotos: os.before_photos ?? [], afterPhotos: os.after_photos ?? [],
+      checklist: os.checklist ?? {}, observations: os.observations,
+      paymentMethod: os.payment_method, technician: os.technician, signature: os.signature,
+    };
+  }
+
+  const c = customer as any;
+  const v = vehicle as any;
   return {
-    id: a.id, customerId: a.customer_id, vehicleId: a.vehicle_id,
-    serviceIds: services.map((s) => s.id),
-    appointmentDate: a.appointment_date, status: a.status, discount: Number(a.discount ?? 0),
-    finalPrice: Number(a.final_price), totalDuration, observations: a.observations, createdAt: a.created_at,
-    customer: { id: a.cid, name: a.cname, phone: a.cphone, email: a.cemail, totalSpent: Number(a.ctotal_spent), totalServices: a.ctotal_services, createdAt: a.ccreated_at, updatedAt: a.cupdated_at },
-    vehicle: { id: a.vid, customerId: a.customer_id, brand: a.vbrand, model: a.vmodel, plate: a.vplate, color: a.vcolor, fuel: a.vfuel, year: a.vyear },
-    services,
+    id: apt.id, customerId: apt.customer_id, vehicleId: apt.vehicle_id,
+    serviceIds, appointmentDate: apt.appointment_date, status: apt.status,
+    discount: Number(apt.discount ?? 0), finalPrice: Number(apt.final_price),
+    totalDuration, observations: apt.observations, createdAt: apt.created_at,
+    customer: c ? {
+      id: c.id, name: c.name, phone: c.phone, email: c.email,
+      totalSpent: Number(c.total_spent), totalServices: c.total_services,
+      createdAt: c.created_at, updatedAt: c.updated_at,
+    } : undefined,
+    vehicle: v ? {
+      id: v.id, customerId: v.customer_id, brand: v.brand, model: v.model,
+      plate: v.plate, color: v.color, fuel: v.fuel, year: v.year,
+    } : undefined,
+    services: validServices.map(mapServiceRow),
     orderService,
   };
 }
 
-const appointmentJoin = `
-  SELECT a.*,
-    c.id as cid, c.name as cname, c.phone as cphone, c.email as cemail, c.total_spent as ctotal_spent, c.total_services as ctotal_services, c.created_at as ccreated_at, c.updated_at as cupdated_at,
-    v.id as vid, v.brand as vbrand, v.model as vmodel, v.plate as vplate, v.color as vcolor, v.fuel as vfuel, v.year as vyear,
-    os.id as os_id, os.before_photos as os_before, os.after_photos as os_after, os.checklist as os_checklist,
-    os.observations as os_obs, os.payment_method as os_payment, os.technician as os_technician, os.signature as os_signature
-  FROM appointments a
-  JOIN customers c ON c.id = a.customer_id
-  JOIN vehicles v ON v.id = a.vehicle_id
-  LEFT JOIN order_services os ON os.appointment_id = a.id
-`;
+// ── GET /appointments ─────────────────────────────────────────────────────────
 
 router.get("/", async (req, res) => {
-  const { page = 1, limit = 20, search = "", status, dateFrom, dateTo, customerId, vehicleId } = req.query as any;
-  const offset = (Number(page) - 1) * Number(limit);
-  const like = `%${search}%`;
-  let where = `WHERE (c.name ILIKE $1 OR v.plate ILIKE $2 OR EXISTS (
-    SELECT 1 FROM appointment_services aps2
-    JOIN services s2 ON s2.id = aps2.service_id
-    WHERE aps2.appointment_id = a.id AND s2.name ILIKE $3
-  ))`;
-  const params: any[] = [like, like, like];
-  if (status) { where += ` AND a.status = $${params.length + 1}`; params.push(status); }
-  if (dateFrom) { where += ` AND a.appointment_date >= $${params.length + 1}`; params.push(dateFrom); }
-  if (dateTo) { where += ` AND a.appointment_date <= $${params.length + 1}`; params.push(dateTo + "T23:59:59"); }
-  if (customerId) { where += ` AND a.customer_id = $${params.length + 1}`; params.push(Number(customerId)); }
-  if (vehicleId) { where += ` AND a.vehicle_id = $${params.length + 1}`; params.push(Number(vehicleId)); }
-  const countSql = `SELECT COUNT(*) as c FROM appointments a JOIN customers c ON c.id = a.customer_id JOIN vehicles v ON v.id = a.vehicle_id ${where}`;
-  const [countRow, rows] = await Promise.all([
-    db.get(countSql, params),
-    db.all(`${appointmentJoin} ${where} ORDER BY a.appointment_date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, Number(limit), offset]),
-  ]);
-  const total = Number((countRow as any)?.c ?? 0);
-  const ids = rows.map((r: any) => r.id);
-  const svcMap = await loadServicesMap(ids);
-  res.json({ data: rows.map((r: any) => mapAppointmentDetail(r, svcMap.get(r.id) || [])), meta: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });
+  const { page = "1", limit = "20", status, customerId, vehicleId, startDate, endDate } = req.query as any;
+  let apts = await getAll("appointments") as any[];
+  if (status) apts = apts.filter((a) => a.status === status);
+  if (customerId) apts = apts.filter((a) => a.customer_id === Number(customerId));
+  if (vehicleId) apts = apts.filter((a) => a.vehicle_id === Number(vehicleId));
+  if (startDate) apts = apts.filter((a) => (a.appointment_date ?? "") >= startDate);
+  if (endDate) apts = apts.filter((a) => (a.appointment_date ?? "") <= endDate + "T23:59:59");
+  apts.sort((a, b) => (b.appointment_date ?? "").localeCompare(a.appointment_date ?? ""));
+  const total = apts.length;
+  const pg = Number(page);
+  const lim = Number(limit);
+  const page_data = apts.slice((pg - 1) * lim, pg * lim);
+  const data = await Promise.all(page_data.map(loadAppointmentDetail));
+  res.json({ data, meta: { total, page: pg, limit: lim, totalPages: Math.ceil(total / lim) } });
 });
 
-router.post("/", async (req, res) => {
-  const { customerId, vehicleId, serviceIds, appointmentDate, discount, observations } = req.body as any;
-  if (!customerId || !vehicleId || !serviceIds?.length || !appointmentDate) {
-    res.status(400).json({ error: "validation", message: "Campos obrigatorios faltando" });
-    return;
-  }
-  const ids: number[] = Array.isArray(serviceIds) ? serviceIds : [serviceIds];
-  const serviceRows = await db.all(`SELECT * FROM services WHERE id = ANY($1::int[])`, [ids]) as any[];
-  if (serviceRows.length !== ids.length) {
-    res.status(400).json({ error: "validation", message: "Um ou mais servicos informados nao existem" });
-    return;
-  }
-  const subtotal = serviceRows.reduce((sum: number, s: any) => sum + Number(s.price), 0);
-  const discountAmount = discount ?? 0;
-  const finalPrice = Math.max(0, subtotal - discountAmount);
-  const aptId = await db.transaction(async (tx) => {
-    const result = await tx.run(
-      "INSERT INTO appointments (customer_id, vehicle_id, appointment_date, discount, final_price, observations) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
-      [customerId, vehicleId, appointmentDate, discountAmount, finalPrice, observations ?? null]
-    );
-    for (const sid of ids) {
-      await tx.run("INSERT INTO appointment_services (appointment_id, service_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [result.id, sid]);
-    }
-    return result.id!;
-  });
-  const created = await db.get(`${appointmentJoin} WHERE a.id = $1`, [aptId]) as any;
-  const svcMap = await loadServicesMap([aptId]);
-  res.status(201).json(mapAppointmentDetail(created, svcMap.get(aptId) || []));
-});
+// ── GET /appointments/:id ─────────────────────────────────────────────────────
 
 router.get("/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  const a = await db.get(`${appointmentJoin} WHERE a.id = $1`, [id]) as any;
-  if (!a) { res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" }); return; }
-  const svcMap = await loadServicesMap([id]);
-  res.json(mapAppointmentDetail(a, svcMap.get(id) || []));
+  const apt = await getById("appointments", Number(req.params.id));
+  if (!apt) { res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" }); return; }
+  res.json(await loadAppointmentDetail(apt));
 });
+
+// ── POST /appointments ────────────────────────────────────────────────────────
+
+router.post("/", async (req, res) => {
+  const { customerId, vehicleId, serviceIds, appointmentDate, discount, finalPrice, observations } = req.body as any;
+  if (!customerId || !vehicleId || !appointmentDate) {
+    res.status(400).json({ error: "validation", message: "Cliente, veiculo e data sao obrigatorios" });
+    return;
+  }
+  const apt = await createDoc("appointments", {
+    customer_id: Number(customerId), vehicle_id: Number(vehicleId),
+    appointment_date: appointmentDate, status: "agendado",
+    discount: Number(discount ?? 0), final_price: Number(finalPrice ?? 0),
+    observations: observations ?? null, created_at: nowIso(),
+  }) as any;
+
+  // Batch-write service associations
+  if (Array.isArray(serviceIds) && serviceIds.length > 0) {
+    const batch = db.batch();
+    for (const sid of serviceIds) {
+      const ref = db.collection("appointment_services").doc();
+      batch.set(ref, { appointment_id: apt.id, service_id: Number(sid) });
+    }
+    await batch.commit();
+  }
+  res.status(201).json(await loadAppointmentDetail(apt));
+});
+
+// ── PUT /appointments/:id ─────────────────────────────────────────────────────
 
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const a = await db.get("SELECT * FROM appointments WHERE id = $1", [id]) as any;
-  if (!a) { res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" }); return; }
-  const { customerId, vehicleId, serviceIds, appointmentDate, status, discount, finalPrice, observations } = req.body as any;
-  let validatedServiceRows: any[] | null = null;
-  if (serviceIds?.length) {
-    const ids: number[] = Array.isArray(serviceIds) ? serviceIds : [serviceIds];
-    const rows = await db.all(`SELECT id, price FROM services WHERE id = ANY($1::int[])`, [ids]) as any[];
-    if (rows.length !== ids.length) {
-      res.status(400).json({ error: "validation", message: "Um ou mais servicos informados nao existem" });
-      return;
-    }
-    validatedServiceRows = rows;
-  }
-  await db.transaction(async (tx) => {
-    let newFinalPrice = finalPrice ?? a.final_price;
-    let newDiscount = discount ?? a.discount ?? 0;
-    if (validatedServiceRows) {
-      const ids2: number[] = Array.isArray(serviceIds) ? serviceIds : [serviceIds];
-      const subtotal = validatedServiceRows.reduce((sum: number, s: any) => sum + Number(s.price), 0);
-      newFinalPrice = finalPrice ?? Math.max(0, subtotal - newDiscount);
-      await tx.run("DELETE FROM appointment_services WHERE appointment_id = $1", [id]);
-      for (const sid of ids2) {
-        await tx.run("INSERT INTO appointment_services (appointment_id, service_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [id, sid]);
-      }
-    } else if (discount !== undefined) {
-      const existing = await tx.all("SELECT s.price FROM appointment_services aps JOIN services s ON s.id = aps.service_id WHERE aps.appointment_id = $1", [id]) as any[];
-      const subtotal = existing.reduce((sum: number, s: any) => sum + Number(s.price), 0);
-      newFinalPrice = finalPrice ?? Math.max(0, subtotal - newDiscount);
-    }
-    await tx.run(
-      "UPDATE appointments SET customer_id=$1, vehicle_id=$2, appointment_date=$3, status=$4, discount=$5, final_price=$6, observations=$7 WHERE id=$8",
-      [customerId ?? a.customer_id, vehicleId ?? a.vehicle_id, appointmentDate ?? a.appointment_date, status ?? a.status, newDiscount, newFinalPrice, observations ?? a.observations, id]
-    );
+  const apt = await getById("appointments", id) as any;
+  if (!apt) { res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" }); return; }
+
+  const { status, serviceIds, appointmentDate, discount, finalPrice, observations, paymentMethod } = req.body as any;
+  const prevStatus = apt.status;
+  const newStatus = status ?? prevStatus;
+
+  await updateDocById("appointments", id, {
+    status: newStatus,
+    appointment_date: appointmentDate ?? apt.appointment_date,
+    discount: discount !== undefined ? Number(discount) : apt.discount,
+    final_price: finalPrice !== undefined ? Number(finalPrice) : apt.final_price,
+    observations: observations ?? apt.observations,
   });
-  if (status && status !== a.status) await handleStatusChange(id, a.status, status);
-  const updated = await db.get(`${appointmentJoin} WHERE a.id = $1`, [id]) as any;
-  const svcMap = await loadServicesMap([id]);
-  res.json(mapAppointmentDetail(updated, svcMap.get(id) || []));
+
+  // Update service IDs atomically if provided
+  if (Array.isArray(serviceIds)) {
+    const existing = await db.collection("appointment_services").where("appointment_id", "==", id).get();
+    const batch = db.batch();
+    existing.docs.forEach((d) => batch.delete(d.ref));
+    for (const sid of serviceIds) {
+      const ref = db.collection("appointment_services").doc();
+      batch.set(ref, { appointment_id: id, service_id: Number(sid) });
+    }
+    await batch.commit();
+  }
+
+  // Side effects on completion — guarded by prevStatus check for idempotency
+  if (newStatus === "concluido" && prevStatus !== "concluido") {
+    const updated = await getById("appointments", id) as any;
+    const price = Number(updated.final_price ?? 0);
+    const dateStr = new Date().toISOString().split("T")[0];
+
+    const aptSvcSnap = await db.collection("appointment_services").where("appointment_id", "==", id).get();
+    const svcIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
+    const [customer, services] = await Promise.all([
+      getById("customers", updated.customer_id),
+      Promise.all(svcIds.map((sid) => getById("services", sid))),
+    ]) as [any, any[]];
+    const validSvcs = services.filter(Boolean) as any[];
+    const svcNames = validSvcs.map((s) => s.name).join(", ");
+    const custName = customer?.name ?? "";
+
+    // Use Firestore transaction for customer update + financial transaction atomicity
+    await db.runTransaction(async (t) => {
+      // Financial transaction
+      const txRef = db.collection("financial_transactions").doc();
+      t.set(txRef, {
+        type: "receita", category: "Servicos",
+        description: `${svcNames} - ${custName}`,
+        amount: price, date: dateStr, appointment_id: id,
+        payment_method: paymentMethod ?? null, created_at: nowIso(),
+      });
+
+      // Update customer totals
+      if (customer) {
+        const custRef = db.collection("customers").doc(String(customer.id));
+        t.update(custRef, {
+          total_spent: Number(customer.total_spent ?? 0) + price,
+          total_services: Number(customer.total_services ?? 0) + 1,
+          last_service_date: dateStr, updated_at: nowIso(),
+        });
+      }
+    });
+
+    // Update loyalty card (separate — uses its own transaction in nextId)
+    const isWash = validSvcs.some((s: any) => s?.category === "Lavagem");
+    if (isWash && customer) {
+      const lSnap = await db.collection("loyalty_cards").where("customer_id", "==", updated.customer_id).limit(1).get();
+      if (lSnap.empty) {
+        await createDoc("loyalty_cards", {
+          customer_id: updated.customer_id, total_washes: 1, current_stamp_count: 1,
+          free_washes_earned: 0, free_washes_used: 0, updated_at: nowIso(),
+        });
+      } else {
+        const l = { id: Number(lSnap.docs[0].id), ...lSnap.docs[0].data() } as any;
+        const newTotal = l.total_washes + 1;
+        const newStamp = (l.current_stamp_count + 1) % 10;
+        const newEarned = Math.floor(newTotal / 10);
+        await updateDocById("loyalty_cards", l.id, {
+          total_washes: newTotal,
+          current_stamp_count: newStamp,
+          free_washes_earned: Math.max(newEarned, l.free_washes_earned),
+          updated_at: nowIso(),
+        });
+      }
+    }
+
+    // Notification
+    await createDoc("notifications", {
+      customer_id: updated.customer_id,
+      title: "Servico Concluido",
+      message: `Ola ${custName}! Seu servico (${svcNames}) foi concluido. Obrigado pela preferencia!`,
+      type: "service_completed", read: 0, created_at: nowIso(),
+    });
+  }
+
+  res.json(await loadAppointmentDetail(await getById("appointments", id)));
 });
 
-router.patch("/:id/status", async (req, res) => {
-  const id = Number(req.params.id);
-  const a = await db.get("SELECT * FROM appointments WHERE id = $1", [id]) as any;
-  if (!a) { res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" }); return; }
-  const { status } = req.body as { status: string };
-  if (!status) { res.status(400).json({ error: "validation", message: "Status e obrigatorio" }); return; }
-  await db.run("UPDATE appointments SET status = $1 WHERE id = $2", [status, id]);
-  await handleStatusChange(id, a.status, status);
-  const updated = await db.get(`${appointmentJoin} WHERE a.id = $1`, [id]) as any;
-  const svcMap = await loadServicesMap([id]);
-  res.json(mapAppointmentDetail(updated, svcMap.get(id) || []));
-});
+// ── DELETE /appointments/:id — cleans up all child records ───────────────────
 
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (!await db.get("SELECT id FROM appointments WHERE id = $1", [id])) {
+  if (!await getById("appointments", id)) {
     res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" });
     return;
   }
-  await db.transaction(async (tx) => {
-    await tx.run("DELETE FROM financial_transactions WHERE appointment_id = $1", [id]);
-    await tx.run("DELETE FROM inventory_movements WHERE appointment_id = $1", [id]);
-    await tx.run("DELETE FROM feedback WHERE appointment_id = $1", [id]);
-    await tx.run("DELETE FROM appointments WHERE id = $1", [id]);
-  });
-  res.json({ message: "Agendamento removido com sucesso" });
-});
 
-export async function handleStatusChange(appointmentId: number, oldStatus: string, newStatus: string): Promise<void> {
-  if (newStatus !== "concluido" || oldStatus === "concluido") return;
-  const a = await db.get("SELECT * FROM appointments WHERE id = $1", [appointmentId]) as any;
-  if (!a) return;
-  const existingTx = await db.get("SELECT id FROM financial_transactions WHERE appointment_id = $1 AND type = 'receita'", [appointmentId]);
-  if (existingTx) return;
-  const services = await db.all(`
-    SELECT s.* FROM appointment_services aps
-    JOIN services s ON s.id = aps.service_id
-    WHERE aps.appointment_id = $1
-  `, [appointmentId]) as any[];
-  const finalPrice = Number(a.final_price ?? services.reduce((s: number, sv: any) => s + Number(sv.price), 0) - Number(a.discount ?? 0));
-  const now = new Date().toISOString();
-  const today = now.split("T")[0];
-  await db.run(
-    "UPDATE customers SET total_services = total_services + 1, total_spent = total_spent + $1, last_service_date = $2, updated_at = $3 WHERE id = $4",
-    [finalPrice, now, now, a.customer_id]
-  );
-  const os = await db.get("SELECT * FROM order_services WHERE appointment_id = $1", [appointmentId]) as any;
-  const paymentMethod = os?.payment_method ?? "dinheiro";
-  const customer = await db.get("SELECT name FROM customers WHERE id = $1", [a.customer_id]) as any;
-  const svcNames = services.map((s: any) => s.name).join(", ") || "Servico";
-  await db.run(
-    "INSERT INTO financial_transactions (type, category, description, amount, date, appointment_id, payment_method) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-    ["receita", "Servicos", `${svcNames} - ${customer?.name ?? ""}`, finalPrice, today, appointmentId, paymentMethod]
-  );
-  const hasWash = services.some((s: any) => s.category?.toLowerCase().includes("lavagem"));
-  if (hasWash) {
-    await db.run("INSERT INTO loyalty_cards (customer_id) VALUES ($1) ON CONFLICT DO NOTHING", [a.customer_id]);
-    await db.run(
-      "UPDATE loyalty_cards SET total_washes = total_washes + 1, current_stamp_count = current_stamp_count + 1, updated_at = $1 WHERE customer_id = $2",
-      [now, a.customer_id]
-    );
-    const loyalty = await db.get("SELECT * FROM loyalty_cards WHERE customer_id = $1", [a.customer_id]) as any;
-    if (loyalty && loyalty.current_stamp_count >= 10) {
-      const newFreeWashes = Math.floor(loyalty.current_stamp_count / 10);
-      const newStamps = loyalty.current_stamp_count % 10;
-      await db.run("UPDATE loyalty_cards SET free_washes_earned = free_washes_earned + $1, current_stamp_count = $2, updated_at = $3 WHERE customer_id = $4",
-        [newFreeWashes, newStamps, now, a.customer_id]);
-      await db.run("INSERT INTO notifications (customer_id, title, message, type) VALUES ($1,$2,$3,$4)",
-        [a.customer_id, "Lavagem Gratis!", `${customer?.name} ganhou ${newFreeWashes} lavagem gratis!`, "loyalty"]);
+  // Gather all child collections
+  const [aptSvcs, orderSvcs, productUsages] = await Promise.all([
+    db.collection("appointment_services").where("appointment_id", "==", id).get(),
+    db.collection("order_services").where("appointment_id", "==", id).get(),
+    db.collection("product_usage").where("appointment_id", "==", id).get(),
+  ]);
+
+  // Restore stock for any product usage before deleting
+  for (const doc of productUsages.docs) {
+    const u = doc.data() as any;
+    const product = await getById("products", u.product_id) as any;
+    if (product) {
+      await updateDocById("products", u.product_id, { stock: Number(product.stock) + Number(u.quantity) });
     }
   }
-  const usages = await db.all("SELECT * FROM product_usage WHERE appointment_id = $1", [appointmentId]) as any[];
-  for (const usage of usages) {
-    await db.run("UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2", [usage.quantity, usage.product_id]);
-    await db.run("INSERT INTO inventory_movements (product_id, movement_type, quantity, reason, appointment_id) VALUES ($1,$2,$3,$4,$5)",
-      [usage.product_id, "saida", usage.quantity, `Utilizado no agendamento #${appointmentId}`, appointmentId]);
-  }
-  await db.run("INSERT INTO notifications (customer_id, title, message, type) VALUES ($1,$2,$3,$4)",
-    [a.customer_id, "Servico Concluido", "Seu servico foi concluido com sucesso. Obrigado!", "system"]);
-}
+
+  // Batch-delete everything
+  const batch = db.batch();
+  aptSvcs.docs.forEach((d) => batch.delete(d.ref));
+  orderSvcs.docs.forEach((d) => batch.delete(d.ref));
+  productUsages.docs.forEach((d) => batch.delete(d.ref));
+  batch.delete(db.collection("appointments").doc(String(id)));
+  await batch.commit();
+
+  res.json({ message: "Agendamento removido com sucesso" });
+});
 
 export default router;

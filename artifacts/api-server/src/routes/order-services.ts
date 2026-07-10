@@ -1,54 +1,74 @@
 import { Router } from "express";
-import { db } from "../db.js";
+import { db, getById, createDoc, updateDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router({ mergeParams: true });
 router.use(authMiddleware);
 
-function mapOS(os: any) {
+function mapOs(os: any) {
   return {
     id: os.id, appointmentId: os.appointment_id,
-    beforePhotos: JSON.parse(os.before_photos || "[]"),
-    afterPhotos: JSON.parse(os.after_photos || "[]"),
-    checklist: JSON.parse(os.checklist || "{}"),
-    observations: os.observations, paymentMethod: os.payment_method,
-    technician: os.technician, signature: os.signature,
+    beforePhotos: os.before_photos ?? [],
+    afterPhotos: os.after_photos ?? [],
+    checklist: os.checklist ?? {},
+    observations: os.observations ?? null,
+    paymentMethod: os.payment_method ?? null,
+    technician: os.technician ?? null,
+    signature: os.signature ?? null,
+    createdAt: os.created_at, updatedAt: os.updated_at,
   };
 }
 
-export function registerOrderServiceRoutes(parentRouter: Router) {
-  parentRouter.get("/:id/order-service", authMiddleware, async (req, res) => {
-    const id = Number(req.params.id);
-    const os = await db.get("SELECT * FROM order_services WHERE appointment_id = $1", [id]) as any;
-    if (!os) { res.status(404).json({ error: "not_found", message: "Ordem de serviço não encontrada" }); return; }
-    res.json(mapOS(os));
-  });
+// GET /appointments/:appointmentId/order-service
+router.get("/", async (req, res) => {
+  const aptId = Number((req.params as any).appointmentId);
+  const snap = await db.collection("order_services").where("appointment_id", "==", aptId).limit(1).get();
+  if (snap.empty) { res.json(null); return; }
+  const os = { id: Number(snap.docs[0].id), ...snap.docs[0].data() };
+  res.json(mapOs(os));
+});
 
-  parentRouter.post("/:id/order-service", authMiddleware, async (req, res) => {
-    const appointmentId = Number(req.params.id);
-    const { beforePhotos, afterPhotos, checklist, observations, paymentMethod, technician, signature } = req.body as any;
-    const existing = await db.get("SELECT id FROM order_services WHERE appointment_id = $1", [appointmentId]);
-    if (existing) { res.status(400).json({ error: "conflict", message: "Ordem de serviço já existe para este agendamento" }); return; }
-    const result = await db.run("INSERT INTO order_services (appointment_id, before_photos, after_photos, checklist, observations, payment_method, technician, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", [appointmentId, JSON.stringify(beforePhotos ?? []), JSON.stringify(afterPhotos ?? []), JSON.stringify(checklist ?? {}), observations ?? null, paymentMethod ?? null, technician ?? null, signature ?? null]);
-    const os = await db.get("SELECT * FROM order_services WHERE id = $1", [result.id]) as any;
-    res.status(201).json(mapOS(os));
+// POST /appointments/:appointmentId/order-service
+router.post("/", async (req, res) => {
+  const aptId = Number((req.params as any).appointmentId);
+  if (!await getById("appointments", aptId)) {
+    res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" }); return;
+  }
+  const existing = await db.collection("order_services").where("appointment_id", "==", aptId).limit(1).get();
+  if (!existing.empty) {
+    res.status(409).json({ error: "conflict", message: "Ordem de servico ja existe para este agendamento" }); return;
+  }
+  const { beforePhotos, afterPhotos, checklist, observations, paymentMethod, technician, signature } = req.body as any;
+  const os = await createDoc("order_services", {
+    appointment_id: aptId,
+    before_photos: beforePhotos ?? [], after_photos: afterPhotos ?? [],
+    checklist: checklist ?? {}, observations: observations ?? null,
+    payment_method: paymentMethod ?? null, technician: technician ?? null,
+    signature: signature ?? null, created_at: nowIso(), updated_at: nowIso(),
   });
+  res.status(201).json(mapOs(os));
+});
 
-  parentRouter.put("/:id/order-service", authMiddleware, async (req, res) => {
-    const appointmentId = Number(req.params.id);
-    const os = await db.get("SELECT * FROM order_services WHERE appointment_id = $1", [appointmentId]) as any;
-    if (!os) { res.status(404).json({ error: "not_found", message: "Ordem de serviço não encontrada" }); return; }
-    const { beforePhotos, afterPhotos, checklist, observations, paymentMethod, technician, signature } = req.body as any;
-    await db.run("UPDATE order_services SET before_photos=$1, after_photos=$2, checklist=$3, observations=$4, payment_method=$5, technician=$6, signature=$7 WHERE appointment_id=$8", [
-      JSON.stringify(beforePhotos ?? JSON.parse(os.before_photos)),
-      JSON.stringify(afterPhotos ?? JSON.parse(os.after_photos)),
-      JSON.stringify(checklist ?? JSON.parse(os.checklist)),
-      observations ?? os.observations, paymentMethod ?? os.payment_method,
-      technician ?? os.technician, signature ?? os.signature, appointmentId
-    ]);
-    const updated = await db.get("SELECT * FROM order_services WHERE appointment_id = $1", [appointmentId]) as any;
-    res.json(mapOS(updated));
+// PUT /appointments/:appointmentId/order-service
+router.put("/", async (req, res) => {
+  const aptId = Number((req.params as any).appointmentId);
+  const snap = await db.collection("order_services").where("appointment_id", "==", aptId).limit(1).get();
+  if (snap.empty) { res.status(404).json({ error: "not_found", message: "Ordem de servico nao encontrada" }); return; }
+  const osId = Number(snap.docs[0].id);
+  const cur = { id: osId, ...snap.docs[0].data() } as any;
+  const { beforePhotos, afterPhotos, checklist, observations, paymentMethod, technician, signature } = req.body as any;
+  await updateDocById("order_services", osId, {
+    before_photos: beforePhotos ?? cur.before_photos,
+    after_photos: afterPhotos ?? cur.after_photos,
+    checklist: checklist ?? cur.checklist,
+    observations: observations ?? cur.observations,
+    payment_method: paymentMethod ?? cur.payment_method,
+    technician: technician ?? cur.technician,
+    signature: signature ?? cur.signature,
+    updated_at: nowIso(),
   });
-}
+  const updated = await getById("order_services", osId);
+  res.json(mapOs(updated));
+});
 
 export default router;

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db } from "../db.js";
+import { getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router();
@@ -11,53 +11,74 @@ function mapUser(u: any) {
 }
 
 router.get("/", async (req, res) => {
-  const { page = 1, limit = 20, search = "" } = req.query as any;
-  const offset = (Number(page) - 1) * Number(limit);
-  const like = `%${search}%`;
-  const total = Number((await db.get("SELECT COUNT(*) as c FROM users WHERE name ILIKE $1 OR email ILIKE $2", [like, like]))?.c ?? 0);
-  const data = await db.all("SELECT * FROM users WHERE name ILIKE $1 OR email ILIKE $2 ORDER BY name LIMIT $3 OFFSET $4", [like, like, Number(limit), offset]);
-  res.json({ data: data.map(mapUser), meta: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });
+  const { page = "1", limit = "20", search = "" } = req.query as any;
+  const all = await getAll("users");
+  const q = (search as string).toLowerCase();
+  const filtered = q
+    ? all.filter((u: any) => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+    : all;
+  filtered.sort((a: any, b: any) => (a.name ?? "").localeCompare(b.name ?? ""));
+  const total = filtered.length;
+  const pg = Number(page);
+  const lim = Number(limit);
+  const offset = (pg - 1) * lim;
+  res.json({
+    data: filtered.slice(offset, offset + lim).map(mapUser),
+    meta: { total, page: pg, limit: lim, totalPages: Math.ceil(total / lim) },
+  });
 });
 
 router.post("/", async (req, res) => {
   const { name, email, password, role } = req.body as any;
-  if (!name || !email || !password || !role) { res.status(400).json({ error: "validation", message: "Campos obrigatórios faltando" }); return; }
-  const hash = bcrypt.hashSync(password, 10);
-  try {
-    const result = await db.run("INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id", [name, email, hash, role]);
-    const user = await db.get("SELECT * FROM users WHERE id = $1", [result.id]) as any;
-    res.status(201).json(mapUser(user));
-  } catch (e: any) {
-    if (e.code === "23505") { res.status(400).json({ error: "conflict", message: "Email já cadastrado" }); }
-    else { res.status(500).json({ error: "server_error", message: "Erro interno" }); }
+  if (!name || !email || !password || !role) {
+    res.status(400).json({ error: "validation", message: "Campos obrigatorios faltando" });
+    return;
   }
+  const all = await getAll("users");
+  if ((all as any[]).some((u: any) => u.email === email)) {
+    res.status(400).json({ error: "conflict", message: "Email ja cadastrado" });
+    return;
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  const user = await createDoc("users", {
+    name, email, password_hash: hash, role, active: 1,
+    created_at: nowIso(), updated_at: nowIso(),
+  });
+  res.status(201).json(mapUser(user));
 });
 
 router.get("/:id", async (req, res) => {
-  const user = await db.get("SELECT * FROM users WHERE id = $1", [Number(req.params.id)]) as any;
-  if (!user) { res.status(404).json({ error: "not_found", message: "Usuário não encontrado" }); return; }
+  const user = await getById("users", Number(req.params.id));
+  if (!user) { res.status(404).json({ error: "not_found", message: "Usuario nao encontrado" }); return; }
   res.json(mapUser(user));
 });
 
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const user = await db.get("SELECT * FROM users WHERE id = $1", [id]) as any;
-  if (!user) { res.status(404).json({ error: "not_found", message: "Usuário não encontrado" }); return; }
+  const user = await getById("users", id) as any;
+  if (!user) { res.status(404).json({ error: "not_found", message: "Usuario nao encontrado" }); return; }
   const { name, email, password, role, active } = req.body as any;
   const newHash = password ? bcrypt.hashSync(password, 10) : user.password_hash;
-  await db.run(
-    "UPDATE users SET name=$1, email=$2, password_hash=$3, role=$4, active=$5, updated_at=$6 WHERE id=$7",
-    [name ?? user.name, email ?? user.email, newHash, role ?? user.role, active !== undefined ? (active ? 1 : 0) : user.active, new Date().toISOString(), id]
-  );
-  const updated = await db.get("SELECT * FROM users WHERE id = $1", [id]) as any;
+  await updateDocById("users", id, {
+    name: name ?? user.name,
+    email: email ?? user.email,
+    password_hash: newHash,
+    role: role ?? user.role,
+    active: active !== undefined ? (active ? 1 : 0) : user.active,
+    updated_at: nowIso(),
+  });
+  const updated = await getById("users", id);
   res.json(mapUser(updated));
 });
 
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (!await db.get("SELECT id FROM users WHERE id = $1", [id])) { res.status(404).json({ error: "not_found", message: "Usuário não encontrado" }); return; }
-  await db.run("DELETE FROM users WHERE id = $1", [id]);
-  res.json({ message: "Usuário removido com sucesso" });
+  if (!await getById("users", id)) {
+    res.status(404).json({ error: "not_found", message: "Usuario nao encontrado" });
+    return;
+  }
+  await deleteDocById("users", id);
+  res.json({ message: "Usuario removido com sucesso" });
 });
 
 export default router;

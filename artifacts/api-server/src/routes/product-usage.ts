@@ -1,39 +1,82 @@
 import { Router } from "express";
-import { db } from "../db.js";
+import { db, getById, createDoc, deleteDocById, updateDocById, nextId, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 
-const router = Router();
+const router = Router({ mergeParams: true });
 router.use(authMiddleware);
 
-function mapUsage(u: any) {
-  return {
-    id: u.id, appointmentId: u.appointment_id, productId: u.product_id, quantity: Number(u.quantity),
-    product: { id: u.product_id, name: u.pname, brand: u.pbrand, stock: Number(u.pstock), minimumStock: Number(u.pmin), unit: u.punit, isLowStock: Number(u.pstock) <= Number(u.pmin) },
-  };
-}
+// GET /appointments/:appointmentId/product-usage
+router.get("/", async (req, res) => {
+  const aptId = Number((req.params as any).appointmentId);
+  const snap = await db.collection("product_usage").where("appointment_id", "==", aptId).get();
+  const usages = snap.docs.map((d) => ({ id: Number(d.id), ...d.data() })) as any[];
+  const products = await Promise.all(usages.map((u) => getById("products", u.product_id)));
+  const prodMap = new Map((products.filter(Boolean) as any[]).map((p: any) => [p.id, p]));
+  res.json(usages.map((u) => {
+    const p = prodMap.get(u.product_id) as any;
+    return {
+      id: u.id, appointmentId: u.appointment_id, productId: u.product_id,
+      quantity: u.quantity, createdAt: u.created_at,
+      product: p ? { id: p.id, name: p.name, brand: p.brand, unit: p.unit, salePrice: Number(p.sale_price ?? 0) } : undefined,
+    };
+  }));
+});
 
-export function registerProductUsageRoutes(parentRouter: Router) {
-  parentRouter.get("/:id/product-usage", authMiddleware, async (req, res) => {
-    const id = Number(req.params.id);
-    const usages = await db.all("SELECT pu.*, p.name as pname, p.brand as pbrand, p.stock as pstock, p.minimum_stock as pmin, p.unit as punit FROM product_usage pu JOIN products p ON p.id = pu.product_id WHERE pu.appointment_id = $1", [id]);
-    res.json(usages.map(mapUsage));
+// POST /appointments/:appointmentId/product-usage — atomic batch
+router.post("/", async (req, res) => {
+  const aptId = Number((req.params as any).appointmentId);
+  const { productId, quantity } = req.body as any;
+  if (!productId || !quantity) {
+    res.status(400).json({ error: "validation", message: "Produto e quantidade sao obrigatorios" }); return;
+  }
+  const product = await getById("products", Number(productId)) as any;
+  if (!product) { res.status(404).json({ error: "not_found", message: "Produto nao encontrado" }); return; }
+  const qty = Number(quantity);
+  const newStock = Number(product.stock) - qty;
+  if (newStock < 0) { res.status(400).json({ error: "stock", message: "Estoque insuficiente" }); return; }
+
+  // Atomic batch: deduct stock + create movement + create usage record
+  const [usageId, movId] = await Promise.all([nextId("product_usage"), nextId("inventory_movements")]);
+  const batch = db.batch();
+  batch.update(db.collection("products").doc(String(Number(productId))), { stock: newStock });
+  batch.set(db.collection("inventory_movements").doc(String(movId)), {
+    product_id: Number(productId), type: "saida", quantity: qty, reason: `Uso em OS #${aptId}`, created_at: nowIso(),
   });
-
-  parentRouter.post("/:id/product-usage", authMiddleware, async (req, res) => {
-    const appointmentId = Number(req.params.id);
-    const { productId, quantity } = req.body as any;
-    if (!productId || quantity === undefined) { res.status(400).json({ error: "validation", message: "Produto e quantidade são obrigatórios" }); return; }
-    const result = await db.run("INSERT INTO product_usage (appointment_id, product_id, quantity) VALUES ($1,$2,$3) RETURNING id", [appointmentId, productId, quantity]);
-    const u = await db.get("SELECT pu.*, p.name as pname, p.brand as pbrand, p.stock as pstock, p.minimum_stock as pmin, p.unit as punit FROM product_usage pu JOIN products p ON p.id = pu.product_id WHERE pu.id = $1", [result.id]) as any;
-    res.status(201).json(mapUsage(u));
+  batch.set(db.collection("product_usage").doc(String(usageId)), {
+    appointment_id: aptId, product_id: Number(productId), quantity: qty, created_at: nowIso(),
   });
-}
+  await batch.commit();
 
-router.delete("/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!await db.get("SELECT id FROM product_usage WHERE id = $1", [id])) { res.status(404).json({ error: "not_found", message: "Registro não encontrado" }); return; }
-  await db.run("DELETE FROM product_usage WHERE id = $1", [id]);
-  res.json({ message: "Registro removido com sucesso" });
+  res.status(201).json({
+    id: usageId, appointmentId: aptId, productId: Number(productId), quantity: qty,
+    product: { id: product.id, name: product.name, brand: product.brand, unit: product.unit, salePrice: Number(product.sale_price ?? 0) },
+  });
+});
+
+// DELETE /appointments/:appointmentId/product-usage/:usageId — restore stock atomically
+router.delete("/:usageId", async (req, res) => {
+  const usageId = Number(req.params.usageId);
+  const usage = await getById("product_usage", usageId) as any;
+  if (!usage) { res.status(404).json({ error: "not_found", message: "Registro de uso nao encontrado" }); return; }
+  const product = await getById("products", usage.product_id) as any;
+
+  if (product) {
+    const movId = await nextId("inventory_movements");
+    const batch = db.batch();
+    batch.update(db.collection("products").doc(String(usage.product_id)), {
+      stock: Number(product.stock) + Number(usage.quantity),
+    });
+    batch.set(db.collection("inventory_movements").doc(String(movId)), {
+      product_id: usage.product_id, type: "entrada", quantity: Number(usage.quantity),
+      reason: `Estorno de uso em OS #${usage.appointment_id}`, created_at: nowIso(),
+    });
+    batch.delete(db.collection("product_usage").doc(String(usageId)));
+    await batch.commit();
+  } else {
+    await deleteDocById("product_usage", usageId);
+  }
+
+  res.json({ message: "Uso de produto removido e estoque restaurado" });
 });
 
 export default router;

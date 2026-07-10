@@ -1,84 +1,80 @@
 import { Router } from "express";
-import { db } from "../db.js";
+import { db, getAll } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router();
 router.use(authMiddleware);
 
+// GET /reports/monthly?year=YYYY
 router.get("/monthly", async (req, res) => {
-  const { month, year } = req.query as any;
-  if (!month || !year) { res.status(400).json({ error: "validation", message: "Mês e ano são obrigatórios" }); return; }
-  const m = Number(month); const y = Number(year);
-  const prefix = `${y}-${String(m).padStart(2, "0")}`;
-
-  const [revRow, expRow, totalAptRow, completedRow, cancelledRow, newCustRow, topServices, revenueByDay] = await Promise.all([
-    db.get("SELECT COALESCE(SUM(amount),0) as s FROM financial_transactions WHERE type='receita' AND date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COALESCE(SUM(amount),0) as s FROM financial_transactions WHERE type='despesa' AND date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM appointments WHERE appointment_date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM appointments WHERE status='concluido' AND appointment_date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM appointments WHERE status='cancelado' AND appointment_date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM customers WHERE created_at LIKE $1", [`${prefix}%`]),
-    db.all(`
-      SELECT s.id as serviceId, s.name as serviceName, COUNT(*) as count,
-        COALESCE(SUM(
-          a.final_price * 1.0 / NULLIF((SELECT COUNT(*) FROM appointment_services aps2 WHERE aps2.appointment_id = a.id), 0)
-        ), 0) as revenue
-      FROM appointments a
-      JOIN appointment_services aps ON aps.appointment_id = a.id
-      JOIN services s ON s.id = aps.service_id
-      WHERE a.status='concluido' AND a.appointment_date LIKE $1
-      GROUP BY s.id, s.name ORDER BY count DESC LIMIT 5
-    `, [`${prefix}%`]),
-    db.all("SELECT date, SUM(amount) as revenue, COUNT(*) as appointments FROM financial_transactions WHERE type='receita' AND date LIKE $1 GROUP BY date ORDER BY date", [`${prefix}%`]),
-  ]);
-
-  const totalRevenue = Number((revRow as any)?.s ?? 0);
-  const totalExpenses = Number((expRow as any)?.s ?? 0);
-
-  res.json({
-    month: m, year: y, totalRevenue, totalExpenses, profit: totalRevenue - totalExpenses,
-    totalAppointments: Number((totalAptRow as any)?.c ?? 0),
-    completedAppointments: Number((completedRow as any)?.c ?? 0),
-    cancelledAppointments: Number((cancelledRow as any)?.c ?? 0),
-    newCustomers: Number((newCustRow as any)?.c ?? 0),
-    topServices: (topServices as any[]).map(s => ({ serviceId: s.serviceid, serviceName: s.servicename, count: Number(s.count), revenue: Number(s.revenue) })),
-    revenueByDay: (revenueByDay as any[]).map(r => ({ date: r.date, revenue: Number(r.revenue), appointments: Number(r.appointments) })),
-  });
+  const { year } = req.query as any;
+  const txs = await getAll("financial_transactions") as any[];
+  const filtered = year ? txs.filter((t) => (t.date ?? "").startsWith(String(year))) : txs;
+  const byMonth: Record<string, { revenue: number; expenses: number; count: number }> = {};
+  for (const t of filtered) {
+    const m = (t.date ?? "").slice(0, 7);
+    if (!m) continue;
+    if (!byMonth[m]) byMonth[m] = { revenue: 0, expenses: 0, count: 0 };
+    byMonth[m].count++;
+    if (t.type === "receita") byMonth[m].revenue += Number(t.amount);
+    else byMonth[m].expenses += Number(t.amount);
+  }
+  const rows = Object.entries(byMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, v]) => ({ month, revenue: v.revenue, expenses: v.expenses, net: v.revenue - v.expenses, transactions: v.count }));
+  const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+  const totalExpenses = rows.reduce((s, r) => s + r.expenses, 0);
+  res.json({ data: rows, summary: { totalRevenue, totalExpenses, net: totalRevenue - totalExpenses } });
 });
 
+// GET /reports/services?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 router.get("/services", async (req, res) => {
-  const { dateFrom, dateTo } = req.query as any;
-  let aptWhere = "WHERE 1=1";
-  const params: any[] = [];
-  if (dateFrom) { aptWhere += ` AND a.appointment_date >= $${params.length + 1}`; params.push(dateFrom); }
-  if (dateTo) { aptWhere += ` AND a.appointment_date <= $${params.length + 1}`; params.push(dateTo + "T23:59:59"); }
-
-  const revWhere = aptWhere + " AND a.status='concluido'";
-
-  const [totalSvcRow, totalRevRow, byCategory, byStatus] = await Promise.all([
-    db.get(`SELECT COUNT(*) as c FROM appointments a JOIN appointment_services aps ON aps.appointment_id = a.id ${aptWhere}`, params),
-    db.get(`SELECT COALESCE(SUM(final_price),0) as s FROM appointments a ${revWhere}`, params),
-    db.all(`
-      SELECT s.category, COUNT(*) as count,
-        COALESCE(SUM(
-          a.final_price * 1.0 / NULLIF((SELECT COUNT(*) FROM appointment_services aps2 WHERE aps2.appointment_id = a.id), 0)
-        ), 0) as revenue
-      FROM appointments a
-      JOIN appointment_services aps ON aps.appointment_id = a.id
-      JOIN services s ON s.id = aps.service_id
-      ${aptWhere}
-      GROUP BY s.category ORDER BY count DESC
-    `, params),
-    db.all(`SELECT status, COUNT(*) as count FROM appointments a ${aptWhere} GROUP BY status`, params),
+  const { startDate, endDate } = req.query as any;
+  let apts = await getAll("appointments") as any[];
+  if (startDate) apts = apts.filter((a) => (a.appointment_date ?? "") >= startDate);
+  if (endDate) apts = apts.filter((a) => (a.appointment_date ?? "") <= endDate + "T23:59:59");
+  const aptIds = new Set(apts.map((a) => a.id));
+  const [aptSvcs, services] = await Promise.all([
+    getAll("appointment_services"),
+    getAll("services"),
   ]);
+  const svcMap = new Map((services as any[]).map((s: any) => [s.id, s]));
+  const counts: Record<number, { name: string; category: string; count: number; revenue: number }> = {};
+  for (const as_ of aptSvcs as any[]) {
+    if (!aptIds.has(as_.appointment_id)) continue;
+    const sid = as_.service_id;
+    const svc = svcMap.get(sid) as any;
+    if (!counts[sid]) counts[sid] = { name: svc?.name ?? String(sid), category: svc?.category ?? "", count: 0, revenue: 0 };
+    counts[sid].count++;
+    counts[sid].revenue += Number(svc?.price ?? 0);
+  }
+  const result = Object.entries(counts)
+    .map(([id, v]) => ({ serviceId: Number(id), ...v }))
+    .sort((a, b) => b.count - a.count);
+  res.json({ data: result, totalServices: result.reduce((s, r) => s + r.count, 0), totalRevenue: result.reduce((s, r) => s + r.revenue, 0) });
+});
 
-  res.json({
-    dateFrom: dateFrom ?? "inicio", dateTo: dateTo ?? "hoje",
-    totalServices: Number((totalSvcRow as any)?.c ?? 0),
-    totalRevenue: Number((totalRevRow as any)?.s ?? 0),
-    byCategory: (byCategory as any[]).map((c: any) => ({ category: c.category ?? "Sem categoria", count: Number(c.count), revenue: Number(c.revenue) })),
-    byStatus: (byStatus as any[]).map((s: any) => ({ status: s.status, count: Number(s.count) })),
-  });
+// GET /reports/customers?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+router.get("/customers", async (req, res) => {
+  const { startDate, endDate } = req.query as any;
+  let apts = await getAll("appointments") as any[];
+  if (startDate) apts = apts.filter((a) => (a.appointment_date ?? "") >= startDate);
+  if (endDate) apts = apts.filter((a) => (a.appointment_date ?? "") <= endDate + "T23:59:59");
+  const completed = apts.filter((a) => a.status === "concluido");
+  const customers = await getAll("customers") as any[];
+  const custMap = new Map(customers.map((c: any) => [c.id, c]));
+  const byCust: Record<number, { name: string; appointments: number; revenue: number }> = {};
+  for (const a of completed) {
+    const cid = a.customer_id;
+    const c = custMap.get(cid) as any;
+    if (!byCust[cid]) byCust[cid] = { name: c?.name ?? String(cid), appointments: 0, revenue: 0 };
+    byCust[cid].appointments++;
+    byCust[cid].revenue += Number(a.final_price ?? 0);
+  }
+  const result = Object.entries(byCust)
+    .map(([id, v]) => ({ customerId: Number(id), ...v }))
+    .sort((a, b) => b.revenue - a.revenue);
+  res.json({ data: result });
 });
 
 export default router;

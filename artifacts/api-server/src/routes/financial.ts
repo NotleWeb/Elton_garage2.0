@@ -1,71 +1,109 @@
 import { Router } from "express";
-import { db } from "../db.js";
+import { getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router();
 router.use(authMiddleware);
 
 function mapTx(t: any) {
-  return { id: t.id, type: t.type, category: t.category, description: t.description, amount: Number(t.amount), date: t.date, appointmentId: t.appointment_id, paymentMethod: t.payment_method, createdAt: t.created_at };
+  return {
+    id: t.id, type: t.type, category: t.category, description: t.description,
+    amount: Number(t.amount), date: t.date,
+    appointmentId: t.appointment_id ?? null,
+    paymentMethod: t.payment_method ?? null,
+    createdAt: t.created_at,
+  };
 }
 
-router.get("/summary", async (req, res) => {
-  const now = new Date();
-  const month = Number((req.query as any).month ?? now.getMonth() + 1);
-  const year = Number((req.query as any).year ?? now.getFullYear());
-  const prefix = `${year}-${String(month).padStart(2, "0")}`;
-  const [revRow, expRow] = await Promise.all([
-    db.get("SELECT COALESCE(SUM(amount), 0) as s FROM financial_transactions WHERE type='receita' AND date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COALESCE(SUM(amount), 0) as s FROM financial_transactions WHERE type='despesa' AND date LIKE $1", [`${prefix}%`]),
-  ]);
-  const revenue = Number((revRow as any)?.s ?? 0);
-  const expenses = Number((expRow as any)?.s ?? 0);
-  res.json({ totalRevenue: revenue, totalExpenses: expenses, profit: revenue - expenses, month, year });
+// GET /financial/summary/monthly - must come before /:id
+router.get("/summary/monthly", async (_req, res) => {
+  const transactions = await getAll("financial_transactions") as any[];
+  // Group by YYYY-MM
+  const byMonth: Record<string, { revenue: number; expenses: number }> = {};
+  for (const t of transactions) {
+    const month = (t.date ?? "").slice(0, 7);
+    if (!month) continue;
+    if (!byMonth[month]) byMonth[month] = { revenue: 0, expenses: 0 };
+    if (t.type === "receita") byMonth[month].revenue += Number(t.amount);
+    else byMonth[month].expenses += Number(t.amount);
+  }
+  const rows = Object.entries(byMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, v]) => ({ month, revenue: v.revenue, expenses: v.expenses, net: v.revenue - v.expenses }));
+  res.json(rows);
 });
 
+// GET /financial
 router.get("/", async (req, res) => {
-  const { page = 1, limit = 20, type, dateFrom, dateTo, category } = req.query as any;
-  const offset = (Number(page) - 1) * Number(limit);
-  let where = "WHERE 1=1";
-  const params: any[] = [];
-  if (type) { where += ` AND type = $${params.length + 1}`; params.push(type); }
-  if (dateFrom) { where += ` AND date >= $${params.length + 1}`; params.push(dateFrom); }
-  if (dateTo) { where += ` AND date <= $${params.length + 1}`; params.push(dateTo); }
-  if (category) { where += ` AND category = $${params.length + 1}`; params.push(category); }
-  const total = Number((await db.get(`SELECT COUNT(*) as c FROM financial_transactions ${where}`, params))?.c ?? 0);
-  const data = await db.all(`SELECT * FROM financial_transactions ${where} ORDER BY date DESC, id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, Number(limit), offset]);
-  res.json({ data: data.map(mapTx), meta: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) } });
+  const { page = "1", limit = "20", type, search = "", startDate, endDate } = req.query as any;
+  const all = await getAll("financial_transactions") as any[];
+  const q = (search as string).toLowerCase();
+  let filtered = all.filter((t: any) => {
+    if (type && t.type !== type) return false;
+    if (q && !t.description?.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
+    if (startDate && t.date < startDate) return false;
+    if (endDate && t.date > endDate) return false;
+    return true;
+  });
+  filtered.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const total = filtered.length;
+  const totalRevenue = filtered.filter((t: any) => t.type === "receita").reduce((s: number, t: any) => s + Number(t.amount), 0);
+  const totalExpenses = filtered.filter((t: any) => t.type === "despesa").reduce((s: number, t: any) => s + Number(t.amount), 0);
+  const pg = Number(page);
+  const lim = Number(limit);
+  res.json({
+    data: filtered.slice((pg - 1) * lim, pg * lim).map(mapTx),
+    meta: { total, page: pg, limit: lim, totalPages: Math.ceil(total / lim) },
+    summary: { totalRevenue, totalExpenses, net: totalRevenue - totalExpenses },
+  });
 });
 
+// POST /financial
 router.post("/", async (req, res) => {
   const { type, category, description, amount, date, appointmentId, paymentMethod } = req.body as any;
-  if (!type || !description || amount === undefined || !date) { res.status(400).json({ error: "validation", message: "Campos obrigatórios faltando" }); return; }
-  const result = await db.run("INSERT INTO financial_transactions (type, category, description, amount, date, appointment_id, payment_method) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id", [type, category ?? null, description, amount, date, appointmentId ?? null, paymentMethod ?? null]);
-  const tx = await db.get("SELECT * FROM financial_transactions WHERE id = $1", [result.id]) as any;
-  res.status(201).json(mapTx(tx));
+  if (!type || !amount || !date) {
+    res.status(400).json({ error: "validation", message: "Tipo, valor e data sao obrigatorios" });
+    return;
+  }
+  const t = await createDoc("financial_transactions", {
+    type, category: category ?? null, description: description ?? null,
+    amount: Number(amount), date, appointment_id: appointmentId ?? null,
+    payment_method: paymentMethod ?? null, created_at: nowIso(),
+  });
+  res.status(201).json(mapTx(t));
 });
 
+// GET /financial/:id
 router.get("/:id", async (req, res) => {
-  const tx = await db.get("SELECT * FROM financial_transactions WHERE id = $1", [Number(req.params.id)]) as any;
-  if (!tx) { res.status(404).json({ error: "not_found", message: "Transação não encontrada" }); return; }
-  res.json(mapTx(tx));
+  const t = await getById("financial_transactions", Number(req.params.id));
+  if (!t) { res.status(404).json({ error: "not_found", message: "Transacao nao encontrada" }); return; }
+  res.json(mapTx(t));
 });
 
+// PUT /financial/:id
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const tx = await db.get("SELECT * FROM financial_transactions WHERE id = $1", [id]) as any;
-  if (!tx) { res.status(404).json({ error: "not_found", message: "Transação não encontrada" }); return; }
-  const { type, category, description, amount, date, paymentMethod } = req.body as any;
-  await db.run("UPDATE financial_transactions SET type=$1, category=$2, description=$3, amount=$4, date=$5, payment_method=$6 WHERE id=$7", [type ?? tx.type, category ?? tx.category, description ?? tx.description, amount ?? tx.amount, date ?? tx.date, paymentMethod ?? tx.payment_method, id]);
-  const updated = await db.get("SELECT * FROM financial_transactions WHERE id = $1", [id]) as any;
+  const t = await getById("financial_transactions", id) as any;
+  if (!t) { res.status(404).json({ error: "not_found", message: "Transacao nao encontrada" }); return; }
+  const { type, category, description, amount, date, appointmentId, paymentMethod } = req.body as any;
+  await updateDocById("financial_transactions", id, {
+    type: type ?? t.type, category: category ?? t.category,
+    description: description ?? t.description, amount: amount !== undefined ? Number(amount) : t.amount,
+    date: date ?? t.date, appointment_id: appointmentId ?? t.appointment_id,
+    payment_method: paymentMethod ?? t.payment_method,
+  });
+  const updated = await getById("financial_transactions", id);
   res.json(mapTx(updated));
 });
 
+// DELETE /financial/:id
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (!await db.get("SELECT id FROM financial_transactions WHERE id = $1", [id])) { res.status(404).json({ error: "not_found", message: "Transação não encontrada" }); return; }
-  await db.run("DELETE FROM financial_transactions WHERE id = $1", [id]);
-  res.json({ message: "Transação removida com sucesso" });
+  if (!await getById("financial_transactions", id)) {
+    res.status(404).json({ error: "not_found", message: "Transacao nao encontrada" }); return;
+  }
+  await deleteDocById("financial_transactions", id);
+  res.json({ message: "Transacao removida com sucesso" });
 });
 
 export default router;

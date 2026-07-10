@@ -1,175 +1,141 @@
 import { Router } from "express";
-import { db } from "../db.js";
+import { db, getAll } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router();
 router.use(authMiddleware);
 
-function getPeriodFilter(month?: number, year?: number) {
+// GET /dashboard/kpis
+router.get("/kpis", async (_req, res) => {
   const now = new Date();
-  const m = month ?? now.getMonth() + 1;
-  const y = year ?? now.getFullYear();
-  return { prefix: `${y}-${String(m).padStart(2, "0")}`, month: m, year: y };
-}
-
-async function loadServicesMap(appointmentIds: number[]): Promise<Map<number, any[]>> {
-  if (!appointmentIds.length) return new Map();
-  const rows = await db.all(`
-    SELECT aps.appointment_id, s.id, s.name, s.price, s.estimated_duration, s.category
-    FROM appointment_services aps
-    JOIN services s ON s.id = aps.service_id
-    WHERE aps.appointment_id = ANY($1::int[])
-  `, [appointmentIds]) as any[];
-  const map = new Map<number, any[]>();
-  for (const row of rows) {
-    if (!map.has(row.appointment_id)) map.set(row.appointment_id, []);
-    map.get(row.appointment_id)!.push({ id: row.id, name: row.name, price: Number(row.price), estimatedDuration: row.estimated_duration, category: row.category });
-  }
-  return map;
-}
-
-function mapAppointmentDetail(a: any, services: any[]) {
-  const totalDuration = services.reduce((s, sv) => s + (sv.estimatedDuration || 0), 0);
-  return {
-    id: a.id, customerId: a.customer_id, vehicleId: a.vehicle_id,
-    serviceIds: services.map((s) => s.id),
-    appointmentDate: a.appointment_date, status: a.status, discount: Number(a.discount ?? 0),
-    finalPrice: Number(a.final_price), totalDuration, observations: a.observations, createdAt: a.created_at,
-    customer: { id: a.cid, name: a.cname, phone: a.cphone, email: a.cemail, totalSpent: Number(a.ctotal_spent), totalServices: a.ctotal_services, createdAt: a.ccreated_at, updatedAt: a.cupdated_at },
-    vehicle: { id: a.vid, customerId: a.customer_id, brand: a.vbrand, model: a.vmodel, plate: a.vplate, color: a.vcolor, fuel: a.vfuel, year: a.vyear },
-    services,
-  };
-}
-
-router.get("/kpis", async (req, res) => {
-  const { month, year } = req.query as any;
-  const { prefix, month: m, year: y } = getPeriodFilter(month ? Number(month) : undefined, year ? Number(year) : undefined);
-  const prevDate = new Date(y, m - 2, 1);
-  const prevM = prevDate.getMonth() + 1;
-  const prevY = prevDate.getFullYear();
-  const prevPrefix = `${prevY}-${String(prevM).padStart(2, "0")}`;
-
-  const [
-    revRow, expRow, prevRevRow,
-    totalAptRow, completedAptRow, pendingAptRow, vehiclesRow,
-    svcDurations, newCustRow, lowStockRow, unreadRow
-  ] = await Promise.all([
-    db.get("SELECT COALESCE(SUM(amount),0) as s FROM financial_transactions WHERE type='receita' AND date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COALESCE(SUM(amount),0) as s FROM financial_transactions WHERE type='despesa' AND date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COALESCE(SUM(amount),0) as s FROM financial_transactions WHERE type='receita' AND date LIKE $1", [`${prevPrefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM appointments WHERE appointment_date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM appointments WHERE status='concluido' AND appointment_date LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM appointments WHERE status IN ('agendado','confirmado','em_andamento')"),
-    db.get("SELECT COUNT(DISTINCT vehicle_id) as c FROM appointments WHERE status='concluido' AND appointment_date LIKE $1", [`${prefix}%`]),
-    db.all(`SELECT s.estimated_duration FROM appointments a JOIN appointment_services aps ON aps.appointment_id = a.id JOIN services s ON s.id = aps.service_id WHERE a.status='concluido' AND a.appointment_date LIKE $1`, [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM customers WHERE created_at LIKE $1", [`${prefix}%`]),
-    db.get("SELECT COUNT(*) as c FROM products WHERE stock <= minimum_stock"),
-    db.get("SELECT COUNT(*) as c FROM notifications WHERE read = 0"),
+  const ym = now.toISOString().slice(0, 7); // "YYYY-MM"
+  const todayStr = now.toISOString().slice(0, 10);
+  const [appointments, transactions, customers, products] = await Promise.all([
+    getAll("appointments"),
+    getAll("financial_transactions"),
+    getAll("customers"),
+    getAll("products"),
   ]);
-
-  const monthlyRevenue = Number((revRow as any)?.s ?? 0);
-  const monthlyExpenses = Number((expRow as any)?.s ?? 0);
-  const prevRevenue = Number((prevRevRow as any)?.s ?? 0);
-  const revenueGrowth = prevRevenue > 0 ? ((monthlyRevenue - prevRevenue) / prevRevenue) * 100 : 0;
-  const totalAppointments = Number((totalAptRow as any)?.c ?? 0);
-  const completedAppointments = Number((completedAptRow as any)?.c ?? 0);
-  const pendingAppointments = Number((pendingAptRow as any)?.c ?? 0);
-  const vehiclesServiced = Number((vehiclesRow as any)?.c ?? 0);
-  const hoursWorked = (svcDurations as any[]).reduce((sum, s) => sum + (s.estimated_duration || 0), 0) / 60;
-  const avgTicket = completedAppointments > 0 ? monthlyRevenue / completedAppointments : 0;
-  const newCustomers = Number((newCustRow as any)?.c ?? 0);
-  const lowStockProducts = Number((lowStockRow as any)?.c ?? 0);
-  const unreadNotifications = Number((unreadRow as any)?.c ?? 0);
-
-  res.json({ monthlyRevenue, monthlyProfit: monthlyRevenue - monthlyExpenses, averageTicket: avgTicket, totalAppointments, completedAppointments, vehiclesServiced, hoursWorked, newCustomers, pendingAppointments, lowStockProducts, unreadNotifications, revenueGrowth });
+  const apts = appointments as any[];
+  const txs = transactions as any[];
+  const monthTxs = txs.filter((t) => (t.date ?? "").startsWith(ym));
+  const revenueMonth = monthTxs.filter((t) => t.type === "receita").reduce((s, t) => s + Number(t.amount), 0);
+  const expensesMonth = monthTxs.filter((t) => t.type === "despesa").reduce((s, t) => s + Number(t.amount), 0);
+  const monthApts = apts.filter((a) => (a.appointment_date ?? "").startsWith(ym));
+  const completedMonth = monthApts.filter((a) => a.status === "concluido").length;
+  const todayApts = apts.filter((a) => (a.appointment_date ?? "").startsWith(todayStr));
+  const scheduledToday = todayApts.filter((a) => a.status === "agendado").length;
+  const inProgress = apts.filter((a) => a.status === "em_andamento").length;
+  const lowStock = (products as any[]).filter((p) => Number(p.stock) <= Number(p.minimum_stock)).length;
+  res.json({
+    revenueThisMonth: revenueMonth,
+    expensesThisMonth: expensesMonth,
+    netThisMonth: revenueMonth - expensesMonth,
+    totalAppointmentsThisMonth: monthApts.length,
+    completedThisMonth: completedMonth,
+    scheduledToday,
+    inProgress,
+    totalCustomers: (customers as any[]).length,
+    lowStockProducts: lowStock,
+  });
 });
 
-router.get("/revenue-by-day", async (req, res) => {
-  const { month, year } = req.query as any;
-  const { prefix } = getPeriodFilter(month ? Number(month) : undefined, year ? Number(year) : undefined);
-  const rows = await db.all("SELECT date, SUM(amount) as revenue, COUNT(*) as appointments FROM financial_transactions WHERE type='receita' AND date LIKE $1 GROUP BY date ORDER BY date", [`${prefix}%`]) as any[];
-  res.json(rows.map(r => ({ date: r.date, revenue: Number(r.revenue), appointments: Number(r.appointments) })));
+// GET /dashboard/revenue-chart  (last 6 months)
+router.get("/revenue-chart", async (_req, res) => {
+  const txs = await getAll("financial_transactions") as any[];
+  // build last 6 months list
+  const months: string[] = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const byMonth: Record<string, { revenue: number; expenses: number }> = {};
+  for (const m of months) byMonth[m] = { revenue: 0, expenses: 0 };
+  for (const t of txs) {
+    const m = (t.date ?? "").slice(0, 7);
+    if (byMonth[m]) {
+      if (t.type === "receita") byMonth[m].revenue += Number(t.amount);
+      else byMonth[m].expenses += Number(t.amount);
+    }
+  }
+  res.json(months.map((m) => ({
+    month: m,
+    revenue: byMonth[m].revenue,
+    expenses: byMonth[m].expenses,
+    net: byMonth[m].revenue - byMonth[m].expenses,
+  })));
 });
 
-router.get("/revenue-by-month", async (req, res) => {
-  const { year } = req.query as any;
-  const y = year ? Number(year) : new Date().getFullYear();
-  const months = await Promise.all(
-    Array.from({ length: 12 }, async (_, i) => {
-      const mo = i + 1;
-      const prefix = `${y}-${String(mo).padStart(2, "0")}`;
-      const [revRow, expRow, aptRow] = await Promise.all([
-        db.get("SELECT COALESCE(SUM(amount),0) as s FROM financial_transactions WHERE type='receita' AND date LIKE $1", [`${prefix}%`]),
-        db.get("SELECT COALESCE(SUM(amount),0) as s FROM financial_transactions WHERE type='despesa' AND date LIKE $1", [`${prefix}%`]),
-        db.get("SELECT COUNT(*) as c FROM appointments WHERE status='concluido' AND appointment_date LIKE $1", [`${prefix}%`]),
-      ]);
-      const revenue = Number((revRow as any)?.s ?? 0);
-      const expenses = Number((expRow as any)?.s ?? 0);
-      return { month: mo, year: y, revenue, expenses, profit: revenue - expenses, appointments: Number((aptRow as any)?.c ?? 0) };
-    })
+// GET /dashboard/top-services
+router.get("/top-services", async (_req, res) => {
+  const [aptSvcs, services] = await Promise.all([
+    getAll("appointment_services"),
+    getAll("services"),
+  ]);
+  const svcMap = new Map((services as any[]).map((s: any) => [s.id, s]));
+  const counts: Record<number, { name: string; count: number; revenue: number }> = {};
+  for (const as_ of aptSvcs as any[]) {
+    const sid = as_.service_id;
+    const svc = svcMap.get(sid) as any;
+    if (!counts[sid]) counts[sid] = { name: svc?.name ?? String(sid), count: 0, revenue: 0 };
+    counts[sid].count++;
+    counts[sid].revenue += Number(svc?.price ?? 0);
+  }
+  const result = Object.entries(counts)
+    .map(([id, v]) => ({ serviceId: Number(id), ...v }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  res.json(result);
+});
+
+// GET /dashboard/top-customers
+router.get("/top-customers", async (_req, res) => {
+  const customers = await getAll("customers") as any[];
+  const top = customers
+    .sort((a, b) => Number(b.total_spent ?? 0) - Number(a.total_spent ?? 0))
+    .slice(0, 5)
+    .map((c) => ({
+      id: c.id, name: c.name, phone: c.phone,
+      totalSpent: Number(c.total_spent ?? 0), totalServices: Number(c.total_services ?? 0),
+    }));
+  res.json(top);
+});
+
+// GET /dashboard/upcoming  (next 7 days)
+router.get("/upcoming", async (_req, res) => {
+  const now = new Date();
+  const start = now.toISOString();
+  const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  let apts = await getAll("appointments") as any[];
+  apts = apts.filter((a) =>
+    (a.appointment_date ?? "") >= start &&
+    (a.appointment_date ?? "") <= end &&
+    a.status === "agendado"
   );
-  res.json(months);
+  apts.sort((a, b) => (a.appointment_date ?? "").localeCompare(b.appointment_date ?? ""));
+  const customers = await getAll("customers");
+  const vehicles = await getAll("vehicles");
+  const custMap = new Map((customers as any[]).map((c: any) => [c.id, c]));
+  const vehMap = new Map((vehicles as any[]).map((v: any) => [v.id, v]));
+  res.json(apts.slice(0, 10).map((a) => {
+    const c = custMap.get(a.customer_id) as any;
+    const v = vehMap.get(a.vehicle_id) as any;
+    return {
+      id: a.id, appointmentDate: a.appointment_date, status: a.status,
+      finalPrice: Number(a.final_price),
+      customer: c ? { id: c.id, name: c.name, phone: c.phone } : undefined,
+      vehicle: v ? { id: v.id, brand: v.brand, model: v.model, plate: v.plate } : undefined,
+    };
+  }));
 });
 
-router.get("/top-services", async (req, res) => {
-  const { month, year, limit = 5 } = req.query as any;
-  const { prefix } = getPeriodFilter(month ? Number(month) : undefined, year ? Number(year) : undefined);
-  const rows = await db.all(`
-    SELECT s.id as serviceId, s.name as serviceName, COUNT(*) as count,
-      COALESCE(SUM(
-        a.final_price * 1.0 / NULLIF((SELECT COUNT(*) FROM appointment_services aps2 WHERE aps2.appointment_id = a.id), 0)
-      ), 0) as revenue
-    FROM appointments a
-    JOIN appointment_services aps ON aps.appointment_id = a.id
-    JOIN services s ON s.id = aps.service_id
-    WHERE a.status='concluido' AND a.appointment_date LIKE $1
-    GROUP BY s.id, s.name ORDER BY count DESC LIMIT $2
-  `, [`${prefix}%`, Number(limit)]) as any[];
-  res.json(rows.map(r => ({ serviceId: r.serviceid, serviceName: r.servicename, count: Number(r.count), revenue: Number(r.revenue) })));
-});
-
-router.get("/top-customers", async (req, res) => {
-  const { month, year, limit = 5 } = req.query as any;
-  const { prefix } = getPeriodFilter(month ? Number(month) : undefined, year ? Number(year) : undefined);
-  const rows = await db.all(`
-    SELECT c.id as customerId, c.name as customerName, COALESCE(SUM(a.final_price), 0) as totalSpent, COUNT(*) as totalServices
-    FROM appointments a JOIN customers c ON c.id = a.customer_id
-    WHERE a.status='concluido' AND a.appointment_date LIKE $1
-    GROUP BY c.id, c.name ORDER BY totalSpent DESC LIMIT $2
-  `, [`${prefix}%`, Number(limit)]) as any[];
-  res.json(rows.map(r => ({ customerId: r.customerid, customerName: r.customername, totalSpent: Number(r.totalspent), totalServices: Number(r.totalservices) })));
-});
-
-router.get("/upcoming-appointments", async (req, res) => {
-  const { limit = 10 } = req.query as any;
-  const now = new Date().toISOString();
-  const rows = await db.all(`
-    SELECT a.*,
-      c.id as cid, c.name as cname, c.phone as cphone, c.email as cemail, c.total_spent as ctotal_spent, c.total_services as ctotal_services, c.created_at as ccreated_at, c.updated_at as cupdated_at,
-      v.id as vid, v.brand as vbrand, v.model as vmodel, v.plate as vplate, v.color as vcolor, v.fuel as vfuel, v.year as vyear
-    FROM appointments a
-    JOIN customers c ON c.id = a.customer_id
-    JOIN vehicles v ON v.id = a.vehicle_id
-    WHERE a.appointment_date >= $1 AND a.status IN ('agendado','confirmado')
-    ORDER BY a.appointment_date ASC LIMIT $2
-  `, [now, Number(limit)]) as any[];
-
-  const ids = rows.map((r) => r.id);
-  const svcMap = await loadServicesMap(ids);
-  res.json(rows.map((r) => mapAppointmentDetail(r, svcMap.get(r.id) || [])));
-});
-
-router.get("/customers-needing-service", async (req, res) => {
-  const { days = 30, limit = 10 } = req.query as any;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - Number(days));
-  const rows = await db.all(`
-    SELECT * FROM customers
-    WHERE (last_service_date IS NOT NULL AND last_service_date < $1)
-       OR (last_service_date IS NULL AND created_at < $2)
-    ORDER BY last_service_date ASC LIMIT $3
-  `, [cutoff.toISOString(), cutoff.toISOString(), Number(limit)]) as any[];
-  res.json(rows.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone, whatsapp: c.whatsapp, email: c.email, totalSpent: Number(c.total_spent), totalServices: c.total_services, lastServiceDate: c.last_service_date, createdAt: c.created_at, updatedAt: c.updated_at })));
+// GET /dashboard/status-counts
+router.get("/status-counts", async (_req, res) => {
+  const apts = await getAll("appointments") as any[];
+  const counts: Record<string, number> = {};
+  for (const a of apts) { counts[a.status] = (counts[a.status] ?? 0) + 1; }
+  res.json(counts);
 });
 
 export default router;
