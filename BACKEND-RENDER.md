@@ -19,11 +19,21 @@ Variáveis de ambiente necessárias:
 
 ## Como conectar o repo no Render
 
-1. Entre em render.com e crie uma conta ou faça login.
+1. Entre em render.com e faça login.
 2. Clique em **New** > **Web Service**.
 3. Conecte seu repositório Git onde está o projeto.
 4. Escolha o branch correto.
-5. Defina as configurações de serviço ou use o `render.yaml` do repo.
+5. Se o Render detectar `render.yaml`, ele usará as configurações automaticamente.
+6. Se não detectar, configure manualmente:
+   - Service type: `Web Service`
+   - Name: `elton-garage-api`
+   - Environment: `Node`
+   - Region: `Oregon`
+   - Plan: `Free`
+   - Branch: `main` (ou o branch que você usar)
+   - Build command: `pnpm install --frozen-lockfile && pnpm run build:render`
+   - Start command: `pnpm --filter @workspace/api-server run start`
+   - Health check path: `/api/healthz`
 
 ## Configuração usada pelo projeto
 
@@ -34,7 +44,7 @@ O `render.yaml` já define:
 - `runtime: node`
 - `region: oregon`
 - `plan: free`
-- `buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build`
+- `buildCommand: pnpm install --frozen-lockfile && pnpm run build:render`
 - `startCommand: pnpm --filter @workspace/api-server run start`
 - `healthCheckPath: /api/healthz`
 
