@@ -2,8 +2,9 @@ import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useLogin } from '@workspace/api-client-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +22,6 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function Login() {
   const [, setLocation] = useLocation();
   const { login: setAuth } = useAuth();
-  const loginMutation = useLogin();
   const { toast } = useToast();
 
   const form = useForm<LoginForm>({
@@ -29,24 +29,27 @@ export default function Login() {
     defaultValues: { email: '', password: '' },
   });
 
-  const onSubmit = (data: LoginForm) => {
-    loginMutation.mutate(
-      { data },
-      {
-        onSuccess: (res) => {
-          setAuth(res.token, res.user);
-          toast({ title: 'Login realizado com sucesso!' });
-          setLocation('/dashboard');
-        },
-        onError: () => {
-          toast({ 
-            title: 'Erro ao fazer login', 
-            description: 'Verifique suas credenciais e tente novamente.',
-            variant: 'destructive'
-          });
-        }
-      }
-    );
+  const onSubmit = async (data: LoginForm) => {
+    try {
+      const credential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      const idToken = await credential.user.getIdToken();
+      setAuth(idToken, {
+        id: 0,
+        name: credential.user.email ?? '',
+        email: credential.user.email ?? '',
+        role: 'receptionist',
+        active: true,
+        createdAt: new Date().toISOString()
+      });
+      toast({ title: 'Login realizado com sucesso!' });
+      setLocation('/dashboard');
+    } catch (error) {
+      toast({
+        title: 'Erro ao fazer login',
+        description: 'Verifique suas credenciais e tente novamente.',
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -96,9 +99,8 @@ export default function Login() {
                 <Button 
                   type="submit" 
                   className="w-full font-semibold h-11" 
-                  disabled={loginMutation.isPending}
                 >
-                  {loginMutation.isPending ? 'Entrando...' : 'Entrar no Sistema'}
+                  Entrar no Sistema
                 </Button>
               </form>
             </Form>

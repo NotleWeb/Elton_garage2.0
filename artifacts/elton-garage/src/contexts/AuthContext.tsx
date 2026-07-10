@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { User, getMe } from '@workspace/api-client-react';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -19,20 +21,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (token) {
-      getMe().then(userData => {
-        setUser(userData);
-      }).catch(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        localStorage.removeItem('elton_garage_token');
         setToken(null);
         setUser(null);
-        localStorage.removeItem('elton_garage_token');
-      }).finally(() => {
-        setIsLoading(false);
-      });
-    } else {
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
       setUser(null);
       setIsLoading(false);
+      return;
     }
+
+    getMe().then(userData => {
+      setUser(userData);
+    }).catch(() => {
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem('elton_garage_token');
+    }).finally(() => {
+      setIsLoading(false);
+    });
   }, [token]);
 
   const login = (newToken: string, newUser: User) => {
@@ -44,6 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    firebaseSignOut(auth).catch(() => {
+      // ignore if Firebase logout fails; still clear local session
+    });
     localStorage.removeItem('elton_garage_token');
     setToken(null);
     setUser(null);
