@@ -1,0 +1,13 @@
+[build]
+  command = "pnpm --filter @workspace/elton-garage run build"
+  publish = "artifacts/elton-garage/dist/public"
+
+[build.environment]
+  BASE_PATH = "/"
+  NODE_VERSION = "20"
+
+# SPA: redireciona todas as rotas para o index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

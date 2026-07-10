@@ -6,6 +6,14 @@ import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useEffect } from 'react';
+import { setBaseUrl } from '@workspace/api-client-react';
+
+// Aponta o cliente para a URL da API configurada via variável de ambiente.
+// Em produção (Netlify): defina VITE_API_URL no painel do Netlify.
+// Ex: https://seu-app.replit.app
+// Em desenvolvimento (Replit): deixe vazio — usa URLs relativas automaticamente.
+const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+if (apiUrl) setBaseUrl(apiUrl);
 
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
