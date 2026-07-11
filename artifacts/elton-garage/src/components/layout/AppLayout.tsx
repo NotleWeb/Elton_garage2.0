@@ -23,9 +23,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen overflow-hidden bg-background">
+      <div className="flex min-h-screen overflow-hidden overflow-x-hidden bg-background">
         <Sidebar />
-        <div className="flex min-h-screen flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-screen flex-1 min-w-0 flex-col overflow-hidden">
           <Header />
           <main className="flex-1 overflow-y-auto py-8">
             <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">

@@ -165,8 +165,8 @@ export default function Produtos() {
       </div>
 
       <Card className="border-border">
-        <div className="rounded-md overflow-hidden">
-          <div className="bg-muted/50 grid grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
+        <div className="overflow-hidden rounded-3xl border border-border bg-secondary/10">
+          <div className="hidden md:grid grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
             <div className="col-span-4 md:col-span-3">Produto</div>
             <div className="col-span-3 hidden md:block">Marca/Fornecedor</div>
             <div className="col-span-3 text-right">Estoque</div>
@@ -174,52 +174,54 @@ export default function Produtos() {
             <div className="col-span-2 md:col-span-1"></div>
           </div>
           
-          <div className="divide-y divide-border">
+          <div className="space-y-4 p-4">
             {isLoading ? (
-              <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></div>
+              <div className="py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></div>
             ) : data?.data.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">Nenhum produto encontrado.</div>
+              <div className="py-8 text-center text-muted-foreground">Nenhum produto encontrado.</div>
             ) : (
               data?.data.map((product) => (
-                <div key={product.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors group">
-                  <div className="col-span-4 md:col-span-3 flex items-center gap-3">
-                    <div className={`p-2 rounded bg-secondary ${product.isLowStock ? 'bg-red-500/10 text-red-500' : 'text-muted-foreground'}`}>
-                      <Package className="w-4 h-4" />
+                <div key={product.id} className="rounded-3xl border border-border bg-background/70 p-4 shadow-sm transition hover:bg-secondary/20">
+                  <div className="grid gap-4 md:grid-cols-12 md:items-center">
+                    <div className="md:col-span-4 flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded ${product.isLowStock ? 'bg-red-500/10 text-red-500' : 'bg-secondary text-muted-foreground'}`}>
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">{product.name}</p>
+                        {product.isLowStock && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded inline-flex items-center gap-1 mt-1">
+                            <AlertTriangle className="w-3 h-3" /> Estoque Baixo
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground truncate">{product.name}</p>
-                      {product.isLowStock && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded flex w-fit items-center gap-1 mt-1">
-                          <AlertTriangle className="w-3 h-3" /> Estoque Baixo
+                    <div className="md:col-span-3 hidden md:block">
+                      <p className="text-sm truncate text-foreground">{product.brand || '-'}</p>
+                      <p className="text-xs text-muted-foreground truncate">{product.supplier}</p>
+                    </div>
+                    <div className="md:col-span-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className={`font-bold ${product.isLowStock ? 'text-red-500' : 'text-foreground'}`}>
+                          {product.stock}
                         </span>
-                      )}
+                        <span className="text-muted-foreground text-xs">{product.unit}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">Min: {product.minimumStock}</p>
                     </div>
-                  </div>
-                  <div className="col-span-3 hidden md:block">
-                    <p className="text-sm truncate text-foreground">{product.brand || '-'}</p>
-                    <p className="text-xs text-muted-foreground truncate">{product.supplier}</p>
-                  </div>
-                  <div className="col-span-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <span className={`font-bold ${product.isLowStock ? 'text-red-500' : 'text-foreground'}`}>
-                        {product.stock}
-                      </span>
-                      <span className="text-muted-foreground text-xs">{product.unit}</span>
+                    <div className="md:col-span-2 text-right font-medium">
+                      {product.salePrice ? formatCurrency(product.salePrice) : '-'}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">Min: {product.minimumStock}</p>
-                  </div>
-                  <div className="col-span-3 md:col-span-2 text-right font-medium">
-                    {product.salePrice ? formatCurrency(product.salePrice) : '-'}
-                  </div>
-                  <div className="col-span-2 md:col-span-1 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setConfirmDeleteId(product.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="md:col-span-1 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setConfirmDeleteId(product.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))
