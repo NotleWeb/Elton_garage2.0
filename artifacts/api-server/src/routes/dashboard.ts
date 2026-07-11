@@ -93,49 +93,31 @@ router.get("/revenue-by-day", async (req, res) => {
 
 // GET /dashboard/top-services
 router.get("/top-services", async (_req, res) => {
-  const txs = await getAll("financial_transactions") as any[];
-  // build last 6 months list
-  const months: string[] = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(d.toISOString().slice(0, 7));
-  }
-  const byMonth: Record<string, { revenue: number; expenses: number }> = {};
-  for (const m of months) byMonth[m] = { revenue: 0, expenses: 0 };
-  for (const t of txs) {
-    const m = (t.date ?? "").slice(0, 7);
-    if (byMonth[m]) {
-      if (t.type === "receita") byMonth[m].revenue += Number(t.amount);
-      else byMonth[m].expenses += Number(t.amount);
-    }
-  }
-  res.json(months.map((m) => ({
-    month: m,
-    revenue: byMonth[m].revenue,
-    expenses: byMonth[m].expenses,
-    net: byMonth[m].revenue - byMonth[m].expenses,
-  })));
-});
-
-// GET /dashboard/top-services
-router.get("/top-services", async (_req, res) => {
-  const [aptSvcs, services] = await Promise.all([
+  const [aptSvcs, appointments, services] = await Promise.all([
     getAll("appointment_services"),
+    getAll("appointments"),
     getAll("services"),
   ]);
+  const completedAptIds = new Set(
+    (appointments as any[])
+      .filter((a) => a.status === "concluido")
+      .map((a) => a.id)
+  );
   const svcMap = new Map((services as any[]).map((s: any) => [s.id, s]));
-  const counts: Record<number, { name: string; count: number; revenue: number }> = {};
+  const counts: Record<number, { serviceName: string; count: number; revenue: number }> = {};
+
   for (const as_ of aptSvcs as any[]) {
+    if (!completedAptIds.has(as_.appointment_id)) continue;
     const sid = as_.service_id;
     const svc = svcMap.get(sid) as any;
-    if (!counts[sid]) counts[sid] = { name: svc?.name ?? String(sid), count: 0, revenue: 0 };
-    counts[sid].count++;
-    counts[sid].revenue += Number(svc?.price ?? 0);
+    if (!svc) continue;
+    if (!counts[sid]) counts[sid] = { serviceName: svc.name, count: 0, revenue: 0 };
+    counts[sid].count += 1;
+    counts[sid].revenue += Number(svc.price ?? 0);
   }
-  const result = Object.entries(counts)
-    .map(([id, v]) => ({ serviceId: Number(id), ...v }))
-    .sort((a, b) => b.count - a.count)
+
+  const result = Object.values(counts)
+    .sort((a, b) => b.count - a.count || b.revenue - a.revenue)
     .slice(0, 5);
   res.json(result);
 });
