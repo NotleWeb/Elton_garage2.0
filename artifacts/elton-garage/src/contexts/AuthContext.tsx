@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { User, getMe } from '@workspace/api-client-react';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -19,18 +17,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('elton_garage_token'));
   const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!firebaseUser) {
-        localStorage.removeItem('elton_garage_token');
-        setToken(null);
-        setUser(null);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -59,9 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    firebaseSignOut(auth).catch(() => {
-      // ignore if Firebase logout fails; still clear local session
-    });
     localStorage.removeItem('elton_garage_token');
     setToken(null);
     setUser(null);
