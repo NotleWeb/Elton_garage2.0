@@ -148,6 +148,113 @@ async function scheduleAppointmentReminderForApt(
   });
 }
 
+// ── HELPERS ─────────────────────────────────────────────────────────────────
+
+async function handleAppointmentCompletion(id: number, paymentMethod?: string | null) {
+  const updated = await getById("appointments", id) as any;
+  if (!updated) return;
+
+  const price = Number(updated.final_price ?? 0);
+  const dateStr = new Date().toISOString().split("T")[0];
+
+  const aptSvcSnap = await db.collection("appointment_services").where("appointment_id", "==", id).get();
+  const svcIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
+  const [customer, services] = await Promise.all([
+    getById("customers", updated.customer_id),
+    Promise.all(svcIds.map((sid) => getById("services", sid))),
+  ]) as [any, any[]];
+  const validSvcs = services.filter(Boolean) as any[];
+  const svcNames = validSvcs.map((s) => s.name).join(", ");
+  const custName = customer?.name ?? "";
+
+  await db.runTransaction(async (t) => {
+    const txRef = db.collection("financial_transactions").doc();
+    t.set(txRef, {
+      type: "receita", category: "Servicos",
+      description: `${svcNames} - ${custName}`,
+      amount: price, date: dateStr, appointment_id: id,
+      payment_method: paymentMethod ?? null, created_at: nowIso(),
+    });
+
+    if (customer) {
+      const custRef = db.collection("customers").doc(String(customer.id));
+      t.update(custRef, {
+        total_spent: Number(customer.total_spent ?? 0) + price,
+        total_services: Number(customer.total_services ?? 0) + 1,
+        last_service_date: dateStr, updated_at: nowIso(),
+      });
+    }
+  });
+
+  const isWash = validSvcs.some((s: any) => s?.category === "Lavagem");
+  if (isWash && customer) {
+    const lSnap = await db.collection("loyalty_cards").where("customer_id", "==", updated.customer_id).limit(1).get();
+    if (lSnap.empty) {
+      await createDoc("loyalty_cards", {
+        customer_id: updated.customer_id, total_washes: 1, current_stamp_count: 1,
+        free_washes_earned: 0, free_washes_used: 0, updated_at: nowIso(),
+      });
+    } else {
+      const l = { id: Number(lSnap.docs[0].id), ...lSnap.docs[0].data() } as any;
+      const newTotal = l.total_washes + 1;
+      const newStamp = (l.current_stamp_count + 1) % 10;
+      const newEarned = Math.floor(newTotal / 10);
+      await updateDocById("loyalty_cards", l.id, {
+        total_washes: newTotal,
+        current_stamp_count: newStamp,
+        free_washes_earned: Math.max(newEarned, l.free_washes_earned),
+        updated_at: nowIso(),
+      });
+    }
+  }
+
+  await createDoc("notifications", {
+    customer_id: updated.customer_id,
+    appointment_id: id,
+    title: "Servico Concluido",
+    message: `Servico de ${custName} (${svcNames}) concluido com sucesso.`,
+    type: "service_completed",
+    subtype: null,
+    scheduled_for: null,
+    read: 0,
+    read_at: null,
+    completed: 0,
+    completed_at: null,
+    archived: 0,
+    created_at: nowIso(),
+  });
+
+  scheduleFollowUpReminders({
+    appointmentId: id,
+    customerId: updated.customer_id,
+    customerName: custName,
+    completionDate: nowIso(),
+  }).catch((err) => logger.error({ err }, "Failed to schedule follow-up reminders"));
+}
+
+// ── PATCH /appointments/:id/status ─────────────────────────────────────────────
+
+router.patch("/:id/status", async (req, res) => {
+  const id = Number(req.params.id);
+  const { status } = req.body as any;
+  if (!status) {
+    res.status(400).json({ error: "validation", message: "Status e obrigatorio" });
+    return;
+  }
+
+  const apt = await getById("appointments", id) as any;
+  if (!apt) { res.status(404).json({ error: "not_found", message: "Agendamento nao encontrado" }); return; }
+
+  const prevStatus = apt.status;
+  await updateDocById("appointments", id, { status, updated_at: nowIso() });
+
+  if (status === "concluido" && prevStatus !== "concluido") {
+    await handleAppointmentCompletion(id, null);
+  }
+
+  res.json(await loadAppointmentDetail(await getById("appointments", id)));
+});
+
 // ── PUT /appointments/:id ─────────────────────────────────────────────────────
 
 router.put("/:id", async (req, res) => {
@@ -180,89 +287,8 @@ router.put("/:id", async (req, res) => {
     await batch.commit();
   }
 
-  // Side effects on completion — guarded by prevStatus check for idempotency
   if (newStatus === "concluido" && prevStatus !== "concluido") {
-    const updated = await getById("appointments", id) as any;
-    const price = Number(updated.final_price ?? 0);
-    const dateStr = new Date().toISOString().split("T")[0];
-
-    const aptSvcSnap = await db.collection("appointment_services").where("appointment_id", "==", id).get();
-    const svcIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
-    const [customer, services] = await Promise.all([
-      getById("customers", updated.customer_id),
-      Promise.all(svcIds.map((sid) => getById("services", sid))),
-    ]) as [any, any[]];
-    const validSvcs = services.filter(Boolean) as any[];
-    const svcNames = validSvcs.map((s) => s.name).join(", ");
-    const custName = customer?.name ?? "";
-
-    // Atomic: financial transaction + customer totals
-    await db.runTransaction(async (t) => {
-      const txRef = db.collection("financial_transactions").doc();
-      t.set(txRef, {
-        type: "receita", category: "Servicos",
-        description: `${svcNames} - ${custName}`,
-        amount: price, date: dateStr, appointment_id: id,
-        payment_method: paymentMethod ?? null, created_at: nowIso(),
-      });
-
-      if (customer) {
-        const custRef = db.collection("customers").doc(String(customer.id));
-        t.update(custRef, {
-          total_spent: Number(customer.total_spent ?? 0) + price,
-          total_services: Number(customer.total_services ?? 0) + 1,
-          last_service_date: dateStr, updated_at: nowIso(),
-        });
-      }
-    });
-
-    // Update loyalty card
-    const isWash = validSvcs.some((s: any) => s?.category === "Lavagem");
-    if (isWash && customer) {
-      const lSnap = await db.collection("loyalty_cards").where("customer_id", "==", updated.customer_id).limit(1).get();
-      if (lSnap.empty) {
-        await createDoc("loyalty_cards", {
-          customer_id: updated.customer_id, total_washes: 1, current_stamp_count: 1,
-          free_washes_earned: 0, free_washes_used: 0, updated_at: nowIso(),
-        });
-      } else {
-        const l = { id: Number(lSnap.docs[0].id), ...lSnap.docs[0].data() } as any;
-        const newTotal = l.total_washes + 1;
-        const newStamp = (l.current_stamp_count + 1) % 10;
-        const newEarned = Math.floor(newTotal / 10);
-        await updateDocById("loyalty_cards", l.id, {
-          total_washes: newTotal,
-          current_stamp_count: newStamp,
-          free_washes_earned: Math.max(newEarned, l.free_washes_earned),
-          updated_at: nowIso(),
-        });
-      }
-    }
-
-    // Service-completed notification (immediate, no schedule)
-    await createDoc("notifications", {
-      customer_id: updated.customer_id,
-      appointment_id: id,
-      title: "Servico Concluido",
-      message: `Servico de ${custName} (${svcNames}) concluido com sucesso.`,
-      type: "service_completed",
-      subtype: null,
-      scheduled_for: null,
-      read: 0,
-      read_at: null,
-      completed: 0,
-      completed_at: null,
-      archived: 0,
-      created_at: nowIso(),
-    });
-
-    // Schedule follow-up reminders — non-blocking
-    scheduleFollowUpReminders({
-      appointmentId: id,
-      customerId: updated.customer_id,
-      customerName: custName,
-      completionDate: nowIso(),
-    }).catch((err) => logger.error({ err }, "Failed to schedule follow-up reminders"));
+    await handleAppointmentCompletion(id, paymentMethod ?? null);
   }
 
   res.json(await loadAppointmentDetail(await getById("appointments", id)));

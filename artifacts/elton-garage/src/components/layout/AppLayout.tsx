@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,14 +22,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+    <SidebarProvider>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header />
+          <main className="flex-1 overflow-y-auto p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useListVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle, getListVehiclesQueryKey, useListCustomers } from '@workspace/api-client-react';
+import { useListVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle, getListVehiclesQueryKey, useListCustomers, getListCustomersQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +46,7 @@ export default function Veiculos() {
   const { data: customersData } = useListCustomers({ limit: 100 });
 
   const createMutation = useCreateVehicle();
+  const deleteMutation = useDeleteVehicle();
 
   const form = useForm<VehicleForm>({
     resolver: zodResolver(vehicleSchema),
@@ -182,6 +183,25 @@ export default function Veiculos() {
                       </Link>
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => {
+                      deleteMutation.mutate({ id: vehicle.id }, {
+                        onSuccess: () => {
+                          queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
+                          queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+                          toast({ title: 'Veículo excluído com sucesso.' });
+                        },
+                        onError: (error: any) => {
+                          toast({ title: error?.data?.message || 'Erro ao excluir veículo.', variant: 'destructive' });
+                        }
+                      });
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm mt-4">

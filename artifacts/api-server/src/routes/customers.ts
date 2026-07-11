@@ -50,9 +50,34 @@ router.post("/", async (req, res) => {
 
 // GET /customers/:id
 router.get("/:id", async (req, res) => {
-  const c = await getById("customers", Number(req.params.id));
+  const customerId = Number(req.params.id);
+  const c = await getById("customers", customerId);
   if (!c) { res.status(404).json({ error: "not_found", message: "Cliente nao encontrado" }); return; }
-  res.json(mapCustomer(c));
+
+  const [vehiclesSnap, loyaltySnap] = await Promise.all([
+    db.collection("vehicles").where("customer_id", "==", customerId).get(),
+    db.collection("loyalty_cards").where("customer_id", "==", customerId).limit(1).get(),
+  ]);
+
+  const vehicles = vehiclesSnap.docs.map((d) => ({ id: Number(d.id), ...d.data() })) as any[];
+  const loyalty = loyaltySnap.empty ? null : { id: Number(loyaltySnap.docs[0].id), ...loyaltySnap.docs[0].data() } as any;
+
+  res.json({
+    ...mapCustomer(c),
+    vehicles: vehicles.map((v) => ({
+      id: v.id, customerId: v.customer_id, brand: v.brand, model: v.model,
+      year: v.year, plate: v.plate, color: v.color, fuel: v.fuel,
+      mileage: v.mileage, notes: v.notes,
+    })),
+    loyaltyCard: loyalty ? {
+      id: loyalty.id,
+      totalWashes: loyalty.total_washes,
+      currentStampCount: loyalty.current_stamp_count,
+      freeWashesEarned: loyalty.free_washes_earned,
+      freeWashesUsed: loyalty.free_washes_used,
+      freeWashesPending: loyalty.free_washes_earned - loyalty.free_washes_used,
+    } : null,
+  });
 });
 
 // PUT /customers/:id
@@ -73,14 +98,40 @@ router.put("/:id", async (req, res) => {
 // DELETE /customers/:id
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (!await getById("customers", id)) {
+  const customer = await getById("customers", id);
+  if (!customer) {
     res.status(404).json({ error: "not_found", message: "Cliente nao encontrado" }); return;
   }
-  const hasApts = await db.collection("appointments").where("customer_id", "==", id).limit(1).get();
-  if (!hasApts.empty) {
-    res.status(409).json({ error: "conflict", message: "Cliente possui agendamentos e nao pode ser excluido." }); return;
+
+  const [appointmentsSnap, loyaltySnap, vehiclesSnap, notificationsSnap] = await Promise.all([
+    db.collection("appointments").where("customer_id", "==", id).get(),
+    db.collection("loyalty_cards").where("customer_id", "==", id).limit(1).get(),
+    db.collection("vehicles").where("customer_id", "==", id).get(),
+    db.collection("notifications").where("customer_id", "==", id).get(),
+  ]);
+
+  const batch = db.batch();
+
+  for (const aptDoc of appointmentsSnap.docs) {
+    const aptId = Number(aptDoc.id);
+    const [aptSvcs, orderSvcs, productUsages] = await Promise.all([
+      db.collection("appointment_services").where("appointment_id", "==", aptId).get(),
+      db.collection("order_services").where("appointment_id", "==", aptId).get(),
+      db.collection("product_usage").where("appointment_id", "==", aptId).get(),
+    ]);
+
+    aptSvcs.docs.forEach((d) => batch.delete(d.ref));
+    orderSvcs.docs.forEach((d) => batch.delete(d.ref));
+    productUsages.docs.forEach((d) => batch.delete(d.ref));
+    batch.delete(db.collection("appointments").doc(String(aptId)));
   }
-  await deleteDocById("customers", id);
+
+  loyaltySnap.docs.forEach((d) => batch.delete(d.ref));
+  vehiclesSnap.docs.forEach((d) => batch.delete(d.ref));
+  notificationsSnap.docs.forEach((d) => batch.delete(d.ref));
+  batch.delete(db.collection("customers").doc(String(id)));
+
+  await batch.commit();
   res.json({ message: "Cliente removido com sucesso" });
 });
 

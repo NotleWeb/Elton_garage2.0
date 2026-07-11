@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import {
   useListAppointments, useCreateAppointment, getListAppointmentsQueryKey,
-  useListCustomers, useListServices, useListCustomerVehicles, useUpdateAppointmentStatus,
-  useDeleteAppointment
+  useListCustomers, useCreateCustomer, getListCustomersQueryKey,
+  useListServices, useListCustomerVehicles, useUpdateAppointmentStatus,
+  getGetDashboardKpisQueryKey, useDeleteAppointment
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDateTime, cn } from '@/lib/utils';
@@ -29,6 +30,17 @@ import { useDebounce } from '@/hooks/use-debounce';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const customerSchema = z.object({
+  name: z.string().min(2, 'Nome obrigatório'),
+  phone: z.string().optional(),
+  whatsapp: z.string().optional(),
+  email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+  address: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type CustomerForm = z.infer<typeof customerSchema>;
 
 const appointmentSchema = z.object({
   customerId: z.coerce.number().min(1, 'Cliente obrigatório'),
@@ -64,6 +76,7 @@ export default function Agendamentos() {
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
+  const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
 
@@ -83,8 +96,16 @@ export default function Agendamentos() {
   const vehicles = (vehiclesResponse as any[]) || [];
 
   const createMutation = useCreateAppointment();
+  const createCustomerMutation = useCreateCustomer();
   const statusMutation = useUpdateAppointmentStatus();
   const deleteMutation = useDeleteAppointment();
+
+  const customerForm = useForm<CustomerForm>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: '', phone: '', whatsapp: '', email: '', address: '', notes: ''
+    }
+  });
 
   const form = useForm<AppointmentForm>({
     resolver: zodResolver(appointmentSchema),
@@ -109,9 +130,12 @@ export default function Agendamentos() {
     createMutation.mutate({ data: { ...values, appointmentDate: new Date(dateStr).toISOString() } as any }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardKpisQueryKey({ month: new Date().getMonth() + 1, year: new Date().getFullYear() }) });
         toast({ title: 'Agendamento criado com sucesso!' });
         setIsCreateOpen(false);
+        setIsNewCustomerOpen(false);
         form.reset();
+        customerForm.reset();
         setSelectedCustomerId(undefined);
       },
       onError: () => {
@@ -124,6 +148,7 @@ export default function Agendamentos() {
     statusMutation.mutate({ id, data: { status: status as any } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardKpisQueryKey({ month: new Date().getMonth() + 1, year: new Date().getFullYear() }) });
         toast({ title: 'Status atualizado com sucesso' });
       }
     });
@@ -208,8 +233,86 @@ export default function Agendamentos() {
                         </SelectContent>
                       </Select>
                       <FormMessage />
+                      <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setIsNewCustomerOpen((open) => !open)}>
+                        {isNewCustomerOpen ? 'Fechar novo cliente' : 'Cadastrar novo cliente'}
+                      </Button>
                     </FormItem>
                   )} />
+
+                  {isNewCustomerOpen && (
+                    <div className="rounded-lg border border-border bg-secondary/50 p-4 space-y-4">
+                      <h2 className="text-sm font-semibold">Novo cliente</h2>
+                      <Form {...customerForm}>
+                        <div className="grid gap-4">
+                          <FormField control={customerForm.control} name="name" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nome</FormLabel>
+                              <FormControl><Input {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField control={customerForm.control} name="phone" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Telefone</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={customerForm.control} name="whatsapp" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>WhatsApp</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField control={customerForm.control} name="email" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>E-mail</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={customerForm.control} name="address" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Endereço</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          </div>
+                          <FormField control={customerForm.control} name="notes" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Observações</FormLabel>
+                              <FormControl><Input {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <div className="flex gap-2 justify-end">
+                            <Button type="button" variant="outline" onClick={() => setIsNewCustomerOpen(false)}>Cancelar</Button>
+                            <Button type="button" onClick={() => {
+                              customerForm.handleSubmit((values) => {
+                                createCustomerMutation.mutate({ data: values }, {
+                                  onSuccess: (customer) => {
+                                    queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+                                    toast({ title: 'Cliente criado com sucesso!' });
+                                    setSelectedCustomerId(customer.id);
+                                    form.setValue('customerId', customer.id);
+                                    setIsNewCustomerOpen(false);
+                                  },
+                                  onError: () => {
+                                    toast({ title: 'Erro ao criar cliente', variant: 'destructive' });
+                                  }
+                                });
+                              })();
+                            }}>Salvar cliente</Button>
+                          </div>
+                        </div>
+                      </Form>
+                    </div>
+                  )}
 
                   {/* Veículo */}
                   <FormField control={form.control} name="vehicleId" render={({ field }) => (

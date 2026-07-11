@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useLogout, useListNotifications } from '@workspace/api-client-react';
 
 export function Header() {
@@ -29,7 +30,7 @@ export function Header() {
   return (
     <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
-        {/* Placeholder for left side elements if needed */}
+        <SidebarTrigger className="md:hidden text-muted-foreground hover:text-foreground" />
       </div>
       
       <div className="flex items-center gap-4">
