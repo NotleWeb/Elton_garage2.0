@@ -28,11 +28,11 @@ export function Header() {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
+    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-4 sm:px-6">
       <div className="flex items-center gap-4">
         <SidebarTrigger className="md:hidden text-muted-foreground hover:text-foreground" />
       </div>
-      
+
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
           <Bell className="w-5 h-5" />

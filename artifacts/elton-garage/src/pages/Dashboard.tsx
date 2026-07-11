@@ -59,23 +59,28 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground capitalize">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            Uma visão centralizada dos principais indicadores e insights do seu negócio.
+          </p>
+        </div>
+        <p className="text-sm text-muted-foreground capitalize">
           {format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita do Mês</CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
+        <Card className="h-full border-border shadow-sm">
+          <CardHeader className="flex items-center justify-between border-b border-border pb-3">
+            <CardTitle className="text-sm font-semibold">Receita do Mês</CardTitle>
+            <DollarSign className="h-5 w-5 text-primary" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(kpis?.monthlyRevenue || 0)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+          <CardContent className="space-y-3 py-4">
+            <div className="text-3xl font-semibold leading-tight">{formatCurrency(kpis?.monthlyRevenue || 0)}</div>
+            <p className="text-sm text-muted-foreground">
               <span className={kpis?.revenueGrowth && kpis.revenueGrowth > 0 ? "text-emerald-500" : "text-red-500"}>
                 {kpis?.revenueGrowth && kpis.revenueGrowth > 0 ? "+" : ""}{kpis?.revenueGrowth?.toFixed(1) || 0}%
               </span> em relação ao mês anterior
@@ -117,12 +122,12 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-7">
         <Card className="col-span-1 lg:col-span-4 border-border shadow-sm">
           <CardHeader>
             <CardTitle>Receita por Dia</CardTitle>
           </CardHeader>
-          <CardContent className="pl-2">
+          <CardContent className="pl-0 py-4">
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueByDay || []}>
@@ -177,8 +182,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-border shadow-sm">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card className="border-border shadow-sm min-h-[260px]">
           <CardHeader>
             <CardTitle>Próximos Agendamentos</CardTitle>
           </CardHeader>
