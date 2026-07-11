@@ -26,8 +26,10 @@ import { PanelLeftIcon } from 'lucide-react';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = '16rem';
-const SIDEBAR_WIDTH_MOBILE = '18rem';
+// Reduced default sidebar width for more workspace (≈25% smaller)
+const SIDEBAR_WIDTH = '12rem';
+// Mobile sidebar should occupy ~75% of the viewport width for better responsiveness
+const SIDEBAR_WIDTH_MOBILE = '75vw';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
 
