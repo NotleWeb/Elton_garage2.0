@@ -82,3 +82,61 @@
     min-height: 100vh;
   }
 }
+
+/* App-wide design tokens and components for consistent layout */
+@layer components {
+  /* Spacing scale (8,12,16,24,32,48) available via utilities but defined here for reference */
+
+  .app-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* KPI / Card styles */
+  .card {
+    @apply bg-card border border-card-border rounded-lg p-4 shadow-sm;
+  }
+
+  .kpi-card {
+    @apply bg-card border border-card-border rounded-lg p-4 shadow-sm flex flex-col justify-between gap-2;
+  }
+
+  .kpi-value {
+    @apply text-2xl sm:text-3xl font-semibold leading-tight;
+  }
+
+  /* Tables: on small screens, convert rows into stacked cards */
+  .responsive-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  @media (max-width: 640px) {
+    .responsive-table thead { display: none; }
+    .responsive-table tbody tr {
+      display: block;
+      margin-bottom: 12px;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--card);
+    }
+    .responsive-table td {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      white-space: normal;
+    }
+    .responsive-table td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      color: rgba(255,255,255,0.7);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+  }
+
+  /* Buttons: consistent sizing and radii */
+  .btn-consistent {
+    @apply min-h-9 px-4 py-2 rounded-md;
+  }
+}

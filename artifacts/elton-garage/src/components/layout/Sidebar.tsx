@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useListNotifications } from '@workspace/api-client-react';
-import { Sidebar as UISidebar } from '@/components/ui/sidebar';
+import { Sidebar as UISidebar, useSidebar } from '@/components/ui/sidebar';
 
 const MENU_GROUPS = [
   {
@@ -57,10 +57,13 @@ export function Sidebar() {
   const [location] = useLocation();
   const { data: notifications } = useListNotifications({ read: false });
   const unreadCount = notifications?.unreadCount || 0;
+  const sidebar = useSidebar();
+  const isMobile = sidebar?.isMobile;
+  const setOpenMobile = sidebar?.setOpenMobile;
 
   return (
     <UISidebar className="border-r border-border bg-card">
-      <div className="h-16 flex items-center px-6 border-b border-border">
+      <div className="h-16 flex items-center px-4 border-b border-border">
         <h1 className="text-xl font-bold text-primary tracking-tight">Elton Garage</h1>
       </div>
       <div className="flex-1 overflow-y-auto py-6 space-y-6">
@@ -76,13 +79,14 @@ export function Sidebar() {
                   <Link 
                     key={item.href} 
                     href={item.href}
+                    onClick={() => { if (isMobile && typeof setOpenMobile === 'function') setOpenMobile(false); }}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                       isActive 
                         ? "bg-primary/10 text-primary" 
                         : "text-foreground hover:bg-secondary hover:text-foreground"
                     )}
-                  >
+                    >
                     <item.icon className="w-4 h-4" />
                     {item.label}
                     {item.badge && unreadCount > 0 && (
