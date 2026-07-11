@@ -147,80 +147,69 @@ export default function Clientes() {
       </div>
 
       <Card className="border-border">
-        <div className="rounded-md border border-border overflow-hidden">
-          <div className="bg-muted/50 grid grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
+        <div className="overflow-hidden rounded-3xl border border-border bg-secondary/10">
+          <div className="hidden md:grid grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
             <div className="col-span-5">Cliente</div>
-            <div className="col-span-2 hidden md:block">Contato</div>
+            <div className="col-span-2">Contato</div>
             <div className="col-span-2 text-right">Valor Gasto</div>
             <div className="col-span-2 text-right hidden lg:block">Última Visita</div>
             <div className="col-span-1"></div>
           </div>
           
-          <div className="divide-y divide-border">
+          <div className="space-y-4 p-4">
             {isLoading ? (
-              <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></div>
+              <div className="py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></div>
             ) : data?.data.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">Nenhum cliente encontrado.</div>
+              <div className="py-8 text-center text-muted-foreground">Nenhum cliente encontrado.</div>
             ) : (
               data?.data.map((customer) => (
-                <div key={customer.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/50 transition-colors group">
-                  {/* Clickable content area */}
-                  <div
-                    className="col-span-10 md:col-span-5 flex items-center gap-3 cursor-pointer"
-                    onClick={() => setLocation(`/clientes/${customer.id}`)}
-                  >
-                    <Avatar className="h-9 w-9 border border-border shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {customer.name.substring(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="overflow-hidden">
-                      <p className="font-medium truncate text-foreground group-hover:text-primary transition-colors">
-                        {customer.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">{customer.totalServices} serviços realizados</p>
+                <div key={customer.id} className="rounded-3xl border border-border bg-background/70 p-4 shadow-sm transition hover:bg-secondary/20">
+                  <div className="grid gap-4 md:grid-cols-12 md:items-center">
+                    <div className="md:col-span-5 flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => setLocation(`/clientes/${customer.id}`)}>
+                      <Avatar className="h-11 w-11 border border-border shrink-0">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {customer.name.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate text-foreground group-hover:text-primary transition-colors">
+                          {customer.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{customer.totalServices} serviços realizados</p>
+                      </div>
                     </div>
-                  </div>
-                  <div
-                    className="col-span-2 hidden md:flex items-center gap-2 text-sm text-muted-foreground cursor-pointer"
-                    onClick={() => setLocation(`/clientes/${customer.id}`)}
-                  >
-                    {(customer.whatsapp || customer.phone) ? (
-                      <>
-                        <Phone className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{customer.whatsapp || customer.phone}</span>
-                      </>
-                    ) : '-'}
-                  </div>
-                  <div
-                    className="col-span-2 text-right font-medium cursor-pointer"
-                    onClick={() => setLocation(`/clientes/${customer.id}`)}
-                  >
-                    {formatCurrency(customer.totalSpent || 0)}
-                  </div>
-                  <div
-                    className="col-span-2 text-right hidden lg:block text-sm text-muted-foreground cursor-pointer"
-                    onClick={() => setLocation(`/clientes/${customer.id}`)}
-                  >
-                    {customer.lastServiceDate ? formatDate(customer.lastServiceDate) : '-'}
-                  </div>
-                  <div className="col-span-2 md:col-span-1 text-right flex justify-end items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setConfirmDeleteId(customer.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                      onClick={() => setLocation(`/clientes/${customer.id}`)}
-                    >
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                    </Button>
+                    <div className="md:col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+                      {(customer.whatsapp || customer.phone) ? (
+                        <>
+                          <Phone className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{customer.whatsapp || customer.phone}</span>
+                        </>
+                      ) : '-'}
+                    </div>
+                    <div className="md:col-span-2 text-right font-medium text-foreground">
+                      {formatCurrency(customer.totalSpent || 0)}
+                    </div>
+                    <div className="md:col-span-2 hidden lg:block text-right text-sm text-muted-foreground">
+                      {customer.lastServiceDate ? formatDate(customer.lastServiceDate) : '-'}
+                    </div>
+                    <div className="md:col-span-1 flex justify-end items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setConfirmDeleteId(customer.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setLocation(`/clientes/${customer.id}`)}
+                      >
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))

@@ -240,7 +240,7 @@ export default function Servicos() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 px-2"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 px-2"
                     onClick={() => setConfirmDeleteId(service.id)}
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-1.5" />

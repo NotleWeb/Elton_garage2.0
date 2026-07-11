@@ -58,7 +58,7 @@ export default function Fidelidade() {
             Nenhuma cartela encontrada.
           </div>
         ) : (
-          data?.data.map((card) => (
+          data?.data.filter((card) => !!card.customer?.name).map((card) => (
             <Card key={card.id} className={`border-border overflow-hidden ${card.freeWashesPending > 0 ? 'ring-1 ring-amber-500/50' : ''}`}>
               <CardHeader className="pb-4 bg-secondary/20">
                 <div className="flex justify-between items-center">
