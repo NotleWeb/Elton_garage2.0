@@ -70,10 +70,15 @@
 }
 
 @layer base {
+  html, body, #root {
+    min-height: 100%;
+    min-width: 100%;
+  }
   * {
     @apply border-border;
   }
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply m-0 font-sans antialiased bg-background text-foreground;
+    min-height: 100vh;
   }
 }

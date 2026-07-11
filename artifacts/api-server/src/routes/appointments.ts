@@ -96,10 +96,12 @@ router.post("/", async (req, res) => {
     res.status(400).json({ error: "validation", message: "Cliente, veiculo e data sao obrigatorios" });
     return;
   }
+  const computedPrice = await calculateAppointmentPrice(serviceIds, discount);
   const apt = await createDoc("appointments", {
     customer_id: Number(customerId), vehicle_id: Number(vehicleId),
     appointment_date: appointmentDate, status: "agendado",
-    discount: Number(discount ?? 0), final_price: Number(finalPrice ?? 0),
+    discount: Number(discount ?? 0),
+    final_price: finalPrice !== undefined ? Number(finalPrice) : computedPrice,
     observations: observations ?? null, created_at: nowIso(),
   }) as any;
 
@@ -150,15 +152,25 @@ async function scheduleAppointmentReminderForApt(
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
 
+async function calculateAppointmentPrice(serviceIds: any[] = [], discount?: any) {
+  const ids = Array.isArray(serviceIds) ? serviceIds.map((sid) => Number(sid)) : [];
+  if (!ids.length) return 0;
+  const services = await Promise.all(ids.map((sid) => getById("services", sid)));
+  const total = services.filter(Boolean).reduce((sum, svc: any) => sum + Number(svc.price ?? 0), 0);
+  const discountValue = Number(discount ?? 0);
+  return Math.max(0, total - discountValue);
+}
+
 async function handleAppointmentCompletion(id: number, paymentMethod?: string | null) {
   const updated = await getById("appointments", id) as any;
   if (!updated) return;
 
-  const price = Number(updated.final_price ?? 0);
-  const dateStr = new Date().toISOString().split("T")[0];
-
   const aptSvcSnap = await db.collection("appointment_services").where("appointment_id", "==", id).get();
   const svcIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
+  const computedPrice = await calculateAppointmentPrice(svcIds, updated.discount);
+  const price = Number(updated.final_price ?? 0) || computedPrice;
+  const dateStr = new Date().toISOString().split("T")[0];
+
   const [customer, services] = await Promise.all([
     getById("customers", updated.customer_id),
     Promise.all(svcIds.map((sid) => getById("services", sid))),
@@ -265,12 +277,16 @@ router.put("/:id", async (req, res) => {
   const { status, serviceIds, appointmentDate, discount, finalPrice, observations, paymentMethod } = req.body as any;
   const prevStatus = apt.status;
   const newStatus = status ?? prevStatus;
+  const updatedDiscount = discount !== undefined ? Number(discount) : apt.discount;
+  const updatedServiceIds = Array.isArray(serviceIds) ? serviceIds : undefined;
+  const computedPrice = updatedServiceIds ? await calculateAppointmentPrice(updatedServiceIds, updatedDiscount) : undefined;
+  const newFinalPrice = finalPrice !== undefined ? Number(finalPrice) : (computedPrice !== undefined ? computedPrice : Number(apt.final_price ?? 0));
 
   await updateDocById("appointments", id, {
     status: newStatus,
     appointment_date: appointmentDate ?? apt.appointment_date,
-    discount: discount !== undefined ? Number(discount) : apt.discount,
-    final_price: finalPrice !== undefined ? Number(finalPrice) : apt.final_price,
+    discount: updatedDiscount,
+    final_price: newFinalPrice,
     observations: observations ?? apt.observations,
     updated_at: nowIso(),
   });

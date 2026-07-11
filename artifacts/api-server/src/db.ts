@@ -93,14 +93,7 @@ export async function initDb(): Promise<void> {
       updated_at: nowIso(),
     });
   }
-
-  const custSnap = await db.collection("customers").limit(1).get();
-  if (!custSnap.empty) return;
-  await seedDemoData();
 }
-
-async function seedDemoData(): Promise<void> {
-  const now = new Date();
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const yesterday = new Date(now);
