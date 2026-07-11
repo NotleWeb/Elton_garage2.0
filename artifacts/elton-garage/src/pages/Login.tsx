@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Car } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -59,42 +58,43 @@ export default function Login() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>E-mail</FormLabel>
-                      <FormControl>
-                        <Input placeholder="seu@email.com" {...field} className="bg-secondary/50" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-muted-foreground" htmlFor="email">
+                  E-mail
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  className="bg-secondary/50"
+                  {...form.register('email')}
                 />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Senha</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} className="bg-secondary/50" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                {form.formState.errors.email && (
+                  <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-muted-foreground" htmlFor="password">
+                  Senha
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  className="bg-secondary/50"
+                  {...form.register('password')}
                 />
-                <Button 
-                  type="submit" 
-                  className="w-full font-semibold h-11" 
-                >
-                  Entrar no Sistema
-                </Button>
-              </form>
-            </Form>
+                {form.formState.errors.password && (
+                  <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full font-semibold h-11">
+                Entrar no Sistema
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
