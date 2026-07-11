@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useListNotifications } from '@workspace/api-client-react';
+import { Sidebar as UISidebar } from '@/components/ui/sidebar';
 
 const MENU_GROUPS = [
   {
@@ -58,7 +59,7 @@ export function Sidebar() {
   const unreadCount = notifications?.unreadCount || 0;
 
   return (
-    <aside className="w-64 border-r border-border bg-card flex flex-col h-full">
+    <UISidebar className="border-r border-border bg-card">
       <div className="h-16 flex items-center px-6 border-b border-border">
         <h1 className="text-xl font-bold text-primary tracking-tight">Elton Garage</h1>
       </div>
@@ -96,6 +97,6 @@ export function Sidebar() {
           </div>
         ))}
       </div>
-    </aside>
+    </UISidebar>
   );
 }
