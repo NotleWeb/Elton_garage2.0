@@ -15,6 +15,9 @@ router.use(authMiddleware);
 function validateTime(datetime: string): { valid: boolean; error?: string } {
   try {
     const d = new Date(datetime);
+    if (Number.isNaN(d.getTime())) {
+      return { valid: false, error: "Data/hora invalida" };
+    }
     const mins = d.getMinutes();
     if (mins !== 0 && mins !== 30) {
       return { valid: false, error: "Agendamentos devem ser em intervalos de 30 minutos (HH:00 ou HH:30)" };
@@ -61,13 +64,39 @@ async function checkScheduleConflict(
   excludeAppointmentId?: number
 ): Promise<{ conflict: boolean; error?: string }> {
   try {
+    const requestedServiceIds = Array.isArray(serviceIds)
+      ? serviceIds.map((sid) => Number(sid)).filter((sid) => Number.isFinite(sid))
+      : [];
     const dateStr = appointmentDate.split("T")[0];
     const allApts = (await getAll("appointments")) as any[];
+    const aptServiceLinks = (await getAll("appointment_services")) as any[];
+    const serviceIdsByAppointment = new Map<number, number[]>();
+
+    for (const link of aptServiceLinks) {
+      const aptId = Number((link as any).appointment_id);
+      const serviceId = Number((link as any).service_id);
+      if (!Number.isFinite(aptId) || !Number.isFinite(serviceId)) continue;
+      const current = serviceIdsByAppointment.get(aptId) ?? [];
+      current.push(serviceId);
+      serviceIdsByAppointment.set(aptId, current);
+    }
+
+    const durationByServiceId = new Map<number, number>();
+    const getTotalDuration = async (ids: number[]): Promise<number> => {
+      let total = 0;
+      for (const sid of ids) {
+        if (!durationByServiceId.has(sid)) {
+          const service = await getById("services", sid) as any;
+          durationByServiceId.set(sid, Number(service?.estimated_duration ?? 0));
+        }
+        total += Number(durationByServiceId.get(sid) ?? 0);
+      }
+      return total;
+    };
     
     // Get requested appointment time and duration
     const reqTime = new Date(appointmentDate);
-    const reqServices = await Promise.all(serviceIds.map((sid) => getById("services", sid)));
-    const reqDuration = reqServices.filter(Boolean).reduce((s, svc: any) => s + (svc?.estimated_duration ?? 0), 0);
+    const reqDuration = await getTotalDuration(requestedServiceIds);
     const reqEnd = new Date(reqTime.getTime() + reqDuration * 60000);
 
     // Check against existing appointments on same date
@@ -79,10 +108,8 @@ async function checkScheduleConflict(
       if (aptDateStr !== dateStr) continue;
 
       const aptTime = new Date(apt.appointment_date);
-      const aptServices = await Promise.all(
-        ((apt as any).serviceIds ?? []).map((sid: number) => getById("services", sid))
-      );
-      const aptDuration = aptServices.filter(Boolean).reduce((s, svc: any) => s + (svc?.estimated_duration ?? 0), 0);
+      const aptServiceIds = serviceIdsByAppointment.get(Number(apt.id)) ?? [];
+      const aptDuration = await getTotalDuration(aptServiceIds);
       const aptEnd = new Date(aptTime.getTime() + aptDuration * 60000);
 
       // Check for overlap
@@ -187,6 +214,44 @@ router.post("/", async (req, res) => {
     return;
   }
 
+  const normalizedServiceIds = Array.isArray(serviceIds)
+    ? serviceIds.map((sid: any) => Number(sid)).filter((sid: number) => Number.isFinite(sid))
+    : [];
+
+  if (normalizedServiceIds.length === 0) {
+    res.status(400).json({ error: "validation", message: "Selecione ao menos 1 servico" });
+    return;
+  }
+
+  const [customer, vehicle] = await Promise.all([
+    getById("customers", Number(customerId)),
+    getById("vehicles", Number(vehicleId)),
+  ]) as [any, any];
+
+  if (!customer) {
+    res.status(400).json({ error: "validation", message: "Cliente nao encontrado" });
+    return;
+  }
+
+  if (!vehicle) {
+    res.status(400).json({ error: "validation", message: "Veiculo nao encontrado" });
+    return;
+  }
+
+  if (Number(vehicle.customer_id) !== Number(customerId)) {
+    res.status(400).json({ error: "validation", message: "Veiculo nao pertence ao cliente selecionado" });
+    return;
+  }
+
+  const requestedServices = await Promise.all(
+    normalizedServiceIds.map((sid: number) => getById("services", sid))
+  );
+
+  if (requestedServices.some((s) => !s)) {
+    res.status(400).json({ error: "validation", message: "Um ou mais servicos selecionados nao existem" });
+    return;
+  }
+
   // Validate time format (30-minute intervals)
   const timeCheck = validateTime(appointmentDate);
   if (!timeCheck.valid) {
@@ -195,13 +260,13 @@ router.post("/", async (req, res) => {
   }
 
   // Check for scheduling conflicts
-  const conflictCheck = await checkScheduleConflict(appointmentDate, serviceIds);
+  const conflictCheck = await checkScheduleConflict(appointmentDate, normalizedServiceIds);
   if (conflictCheck.conflict) {
     res.status(409).json({ error: "schedule_conflict", message: conflictCheck.error });
     return;
   }
 
-  const computedPrice = await calculateAppointmentPrice(serviceIds, discount);
+  const computedPrice = await calculateAppointmentPrice(normalizedServiceIds, discount);
   const apt = await createDoc("appointments", {
     customer_id: Number(customerId), vehicle_id: Number(vehicleId),
     appointment_date: appointmentDate, status: "agendado",
@@ -212,9 +277,9 @@ router.post("/", async (req, res) => {
   }) as any;
 
   // Batch-write service associations
-  if (Array.isArray(serviceIds) && serviceIds.length > 0) {
+  if (normalizedServiceIds.length > 0) {
     const batch = db.batch();
-    for (const sid of serviceIds) {
+    for (const sid of normalizedServiceIds) {
       const ref = db.collection("appointment_services").doc();
       batch.set(ref, { appointment_id: apt.id, service_id: Number(sid) });
     }
@@ -222,7 +287,7 @@ router.post("/", async (req, res) => {
   }
 
   // Schedule appointment reminder (1 hour before) — non-blocking
-  scheduleAppointmentReminderForApt(apt.id, customerId, vehicleId, serviceIds ?? [], appointmentDate)
+  scheduleAppointmentReminderForApt(apt.id, customerId, vehicleId, normalizedServiceIds, appointmentDate)
     .catch((err) => logger.error({ err }, "Failed to schedule appointment reminder"));
 
   res.status(201).json(await loadAppointmentDetail(apt));
