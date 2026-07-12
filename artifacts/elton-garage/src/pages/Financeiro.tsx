@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   useListTransactions, useCreateTransaction, getListTransactionsQueryKey,
-  useGetFinancialSummary
+  useGetFinancialSummary, useUpdateTransaction, useDeleteTransaction
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ArrowDownRight, ArrowUpRight, Loader2, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Plus, ArrowDownRight, ArrowUpRight, Loader2, TrendingUp, TrendingDown, DollarSign, Edit2, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -36,6 +36,8 @@ export default function Financeiro() {
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState<string>('todos');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
   const [year, setYear] = useState(currentDate.getFullYear());
   
@@ -51,6 +53,8 @@ export default function Financeiro() {
   });
 
   const createMutation = useCreateTransaction();
+  const updateMutation = useUpdateTransaction();
+  const deleteMutation = useDeleteTransaction();
 
   const form = useForm<TransactionForm>({
     resolver: zodResolver(transactionSchema),
@@ -59,22 +63,62 @@ export default function Financeiro() {
     }
   });
 
+  const handleEditTransaction = (tx: any) => {
+    setEditingId(tx.id);
+    form.reset({
+      type: tx.type,
+      category: tx.category,
+      description: tx.description,
+      amount: tx.amount,
+      date: tx.date.split('T')[0],
+      paymentMethod: tx.paymentMethod
+    });
+    setIsCreateOpen(true);
+  };
+
+  const handleDeleteTransaction = (id: number) => {
+    setShowDeleteConfirm(id);
+  };
+
+  const confirmDelete = () => {
+    if (showDeleteConfirm === null) return;
+    deleteMutation.mutate({ id: showDeleteConfirm }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+        toast({ title: 'Transação removida com sucesso!' });
+        setShowDeleteConfirm(null);
+      },
+      onError: () => toast({ title: 'Erro ao remover transação', variant: 'destructive' })
+    });
+  };
+
   const onSubmit = (values: TransactionForm) => {
-    // Add time if it's just a date
     let dateStr = values.date;
     if (dateStr.length === 10) dateStr += 'T12:00:00.000Z';
     else if (!dateStr.endsWith('Z')) dateStr = new Date(dateStr).toISOString();
 
-    createMutation.mutate({ data: { ...values, date: dateStr } }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
-        // Can't invalidate summary directly easily without the exact queryKey, but it refetches on month change
-        toast({ title: 'Transação registrada com sucesso!' });
-        setIsCreateOpen(false);
-        form.reset();
-      },
-      onError: () => toast({ title: 'Erro ao registrar transação', variant: 'destructive' })
-    });
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data: { ...values, date: dateStr } }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+          toast({ title: 'Transação atualizada com sucesso!' });
+          setIsCreateOpen(false);
+          setEditingId(null);
+          form.reset();
+        },
+        onError: () => toast({ title: 'Erro ao atualizar transação', variant: 'destructive' })
+      });
+    } else {
+      createMutation.mutate({ data: { ...values, date: dateStr } }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+          toast({ title: 'Transação registrada com sucesso!' });
+          setIsCreateOpen(false);
+          form.reset();
+        },
+        onError: () => toast({ title: 'Erro ao registrar transação', variant: 'destructive' })
+      });
+    }
   };
 
   const getMethodLabel = (method?: string) => {
@@ -88,19 +132,28 @@ export default function Financeiro() {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Financeiro</h1>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={(open) => { 
+          setIsCreateOpen(open); 
+          if (!open) { 
+            setEditingId(null); 
+            form.reset({ 
+              type: 'despesa', category: 'Geral', description: '', amount: 0, 
+              date: new Date().toISOString().split('T')[0], paymentMethod: undefined 
+            }); 
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" /> Nova Lançamento</Button>
+            <Button><Plus className="w-4 h-4 mr-2" /> {editingId ? 'Editar' : 'Nova'} Transação</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Registrar Transação</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? 'Editar Transação' : 'Registrar Transação'}</DialogTitle></DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="type" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="receita" className="text-emerald-500 font-medium">Receita (+)</SelectItem>
@@ -121,7 +174,7 @@ export default function Financeiro() {
                   <FormField control={form.control} name="category" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Categoria</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="Serviços">Serviços</SelectItem>
@@ -156,8 +209,8 @@ export default function Financeiro() {
                   <FormItem><FormLabel>Data</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                  <Button type="submit" disabled={createMutation.isPending}>Salvar</Button>
+                  <Button type="button" variant="outline" onClick={() => { setIsCreateOpen(false); setEditingId(null); }}>Cancelar</Button>
+                  <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>{editingId ? 'Atualizar' : 'Salvar'}</Button>
                 </div>
               </form>
             </Form>
@@ -266,7 +319,7 @@ export default function Financeiro() {
                   <div className="p-8 text-center text-muted-foreground">Nenhuma transação encontrada.</div>
                 ) : (
                   transactions?.data.map((tx) => (
-                    <div key={tx.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors">
+                    <div key={tx.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors group">
                       <div className="col-span-2 text-sm text-muted-foreground">
                         {formatDateTime(tx.date).split(' ')[0]}
                       </div>
@@ -280,14 +333,47 @@ export default function Financeiro() {
                       <div className="col-span-2 hidden md:block text-center text-sm text-muted-foreground">
                         {getMethodLabel(tx.paymentMethod)}
                       </div>
-                      <div className={`col-span-4 md:col-span-2 text-right font-bold flex items-center justify-end gap-1 ${tx.type === 'receita' ? 'text-emerald-500' : 'text-red-500'}`}>
+                      <div className={`col-span-3 md:col-span-2 text-right font-bold flex items-center justify-end gap-1 ${tx.type === 'receita' ? 'text-emerald-500' : 'text-red-500'}`}>
                         {tx.type === 'receita' ? '+' : '-'}{formatCurrency(tx.amount)}
+                      </div>
+                      <div className="col-span-1 md:col-span-1 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          onClick={() => handleEditTransaction(tx)}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteTransaction(tx.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                     </div>
                   ))
                 )}
               </div>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={showDeleteConfirm !== null} onOpenChange={(open) => { if (!open) setShowDeleteConfirm(null); }}>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Confirmar Exclusão</DialogTitle></DialogHeader>
+                <p className="text-sm text-muted-foreground">Tem certeza que deseja remover esta transação? Esta ação não pode ser desfeita.</p>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>Cancelar</Button>
+                  <Button variant="destructive" disabled={deleteMutation.isPending} onClick={confirmDelete}>
+                    {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Excluir
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </Card>
           
           {transactions?.meta && transactions.meta.totalPages > 1 && (
