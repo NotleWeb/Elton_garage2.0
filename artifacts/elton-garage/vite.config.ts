@@ -70,6 +70,14 @@ export default defineConfig(async () => {
       fs: {
         strict: true,
       },
+      // Proxy /api to the backend in dev (set API_PORT or default 3001)
+      proxy: process.env.VITE_API_URL ? undefined : {
+        '/api': {
+          target: `http://localhost:${process.env.API_PORT ?? 3001}`,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
     preview: {
       port,

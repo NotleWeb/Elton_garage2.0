@@ -5,6 +5,9 @@
 [build.environment]
   BASE_PATH = "/"
   NODE_VERSION = "20"
+  # Defina VITE_API_URL no painel do Netlify apontando para a URL do Render
+  # Ex: https://elton-garage-api.onrender.com
+  # VITE_API_URL = "https://elton-garage-api.onrender.com"
 
 # SPA: redireciona todas as rotas para o index.html
 [[redirects]]
