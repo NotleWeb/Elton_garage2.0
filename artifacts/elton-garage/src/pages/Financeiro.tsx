@@ -308,8 +308,9 @@ export default function Financeiro() {
                 <div className="col-span-2">Data</div>
                 <div className="col-span-4">Descrição</div>
                 <div className="col-span-2 hidden md:block text-center">Categoria</div>
-                <div className="col-span-2 hidden md:block text-center">Pagamento</div>
+                <div className="col-span-1 hidden md:block text-center">Pagamento</div>
                 <div className="col-span-4 md:col-span-2 text-right">Valor</div>
+                <div className="col-span-2 md:col-span-1 text-right">Ações</div>
               </div>
               
               <div className="divide-y divide-border">
@@ -319,7 +320,7 @@ export default function Financeiro() {
                   <div className="p-8 text-center text-muted-foreground">Nenhuma transação encontrada.</div>
                 ) : (
                   transactions?.data.map((tx) => (
-                    <div key={tx.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors group">
+                    <div key={tx.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors">
                       <div className="col-span-2 text-sm text-muted-foreground">
                         {formatDateTime(tx.date).split(' ')[0]}
                       </div>
@@ -330,28 +331,28 @@ export default function Financeiro() {
                       <div className="col-span-2 hidden md:block text-center text-sm text-muted-foreground">
                         {tx.category || '-'}
                       </div>
-                      <div className="col-span-2 hidden md:block text-center text-sm text-muted-foreground">
+                      <div className="col-span-1 hidden md:block text-center text-sm text-muted-foreground">
                         {getMethodLabel(tx.paymentMethod)}
                       </div>
-                      <div className={`col-span-3 md:col-span-2 text-right font-bold flex items-center justify-end gap-1 ${tx.type === 'receita' ? 'text-emerald-500' : 'text-red-500'}`}>
+                      <div className={`col-span-2 text-right font-bold ${tx.type === 'receita' ? 'text-emerald-500' : 'text-red-500'}`}>
                         {tx.type === 'receita' ? '+' : '-'}{formatCurrency(tx.amount)}
                       </div>
-                      <div className="col-span-1 md:col-span-1 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="col-span-2 md:col-span-1 flex justify-end items-center gap-1">
                         <Button 
                           variant="ghost" 
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
                           onClick={() => handleEditTransaction(tx)}
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Edit2 className="w-3 h-3" />
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                           onClick={() => handleDeleteTransaction(tx.id)}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
@@ -359,21 +360,6 @@ export default function Financeiro() {
                 )}
               </div>
             </div>
-
-            {/* Delete Confirmation Dialog */}
-            <Dialog open={showDeleteConfirm !== null} onOpenChange={(open) => { if (!open) setShowDeleteConfirm(null); }}>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Confirmar Exclusão</DialogTitle></DialogHeader>
-                <p className="text-sm text-muted-foreground">Tem certeza que deseja remover esta transação? Esta ação não pode ser desfeita.</p>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>Cancelar</Button>
-                  <Button variant="destructive" disabled={deleteMutation.isPending} onClick={confirmDelete}>
-                    {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Excluir
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
           </Card>
           
           {transactions?.meta && transactions.meta.totalPages > 1 && (
@@ -385,6 +371,21 @@ export default function Financeiro() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog — rendered at page root to avoid portal/overflow issues */}
+      <Dialog open={showDeleteConfirm !== null} onOpenChange={(open) => { if (!open) setShowDeleteConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar Exclusão</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Tem certeza que deseja remover esta transação? Esta ação não pode ser desfeita.</p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteMutation.isPending} onClick={confirmDelete}>
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
