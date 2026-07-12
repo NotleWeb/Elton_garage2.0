@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
+import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso, nextId } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { scheduleAppointmentReminder, scheduleFollowUpReminders } from "../services/notification.service.js";
 import { logger } from "../lib/logger.js";
@@ -285,14 +285,18 @@ async function handleAppointmentCompletion(id: number, paymentMethod?: string | 
   const svcNames = validSvcs.map((s) => s.name).join(", ");
   const custName = customer?.name ?? "";
 
+  // Use integer ID (nextId) so the financial transaction is deletable/editable later
+  const txId = await nextId("financial_transactions");
+  const txData = {
+    type: "receita", category: "Servicos",
+    description: `${svcNames} - ${custName}`,
+    amount: price, date: dateStr, appointment_id: id,
+    payment_method: paymentMethod ?? null, created_at: nowIso(),
+  };
+
   await db.runTransaction(async (t) => {
-    const txRef = db.collection("financial_transactions").doc();
-    t.set(txRef, {
-      type: "receita", category: "Servicos",
-      description: `${svcNames} - ${custName}`,
-      amount: price, date: dateStr, appointment_id: id,
-      payment_method: paymentMethod ?? null, created_at: nowIso(),
-    });
+    const txRef = db.collection("financial_transactions").doc(String(txId));
+    t.set(txRef, txData);
 
     if (customer) {
       const custRef = db.collection("customers").doc(String(customer.id));
