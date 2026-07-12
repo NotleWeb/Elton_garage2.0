@@ -4,10 +4,12 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { token, isLoading } = useAuth();
   const [location] = useLocation();
+  const isMobile = useIsMobile();
 
   if (isLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">Carregando...</div>;
@@ -27,8 +29,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <Sidebar />
         <div className="flex min-h-screen flex-1 min-w-0 flex-col overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto py-8">
-            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <main className={`flex-1 overflow-y-auto ${isMobile ? 'py-3' : 'py-8'}`}>
+            <div className={`mx-auto w-full ${isMobile ? 'max-w-6xl px-3' : 'max-w-7xl px-4 sm:px-6 lg:px-8'}`}>
               {children}
             </div>
           </main>
