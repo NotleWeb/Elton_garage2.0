@@ -12,9 +12,11 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useLogout, useListNotifications } from '@workspace/api-client-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function Header() {
   const { user, logout } = useAuth();
+  const isMobile = useIsMobile();
   const logoutMutation = useLogout();
   const { data: notifications } = useListNotifications({ read: false });
   const unreadCount = notifications?.unreadCount || 0;
@@ -28,7 +30,7 @@ export function Header() {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-4 sm:px-6">
+    <header className={`border-b border-border bg-card flex items-center justify-between ${isMobile ? 'h-14 px-3' : 'h-16 px-4 sm:px-6'}`}>
       <div className="flex items-center gap-4">
         <SidebarTrigger className="md:hidden text-muted-foreground hover:text-foreground" />
       </div>
