@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Car } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const loginSchema = z.object({
@@ -46,9 +45,11 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <div className="bg-primary/10 p-5 rounded-full ring-8 ring-primary/5">
-            <Car className="w-12 h-12 text-primary" />
-          </div>
+          <img
+            src="/logo-elton-garage.png"
+            alt="Elton Garage"
+            className="w-44 h-auto drop-shadow-xl"
+          />
         </div>
         <Card className="border-border/50 shadow-2xl bg-card">
           <CardHeader className="space-y-2 text-center">

@@ -46,7 +46,13 @@ const appointmentSchema = z.object({
   customerId: z.coerce.number().min(1, 'Cliente obrigatório'),
   vehicleId: z.coerce.number().min(1, 'Veículo obrigatório'),
   serviceIds: z.array(z.number()).min(1, 'Selecione ao menos 1 serviço'),
-  appointmentDate: z.string().min(1, 'Data/Hora obrigatória'),
+  appointmentDate: z.string().min(1, 'Data/Hora obrigatória').refine((value) => {
+    const normalized = value.length === 16 ? `${value}:00` : value;
+    const d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) return false;
+    const mins = d.getMinutes();
+    return (mins === 0 || mins === 30) && d.getSeconds() === 0;
+  }, 'Horário deve estar em intervalos de 30 minutos (HH:00 ou HH:30)'),
   discount: z.coerce.number().optional(),
   observations: z.string().optional()
 });
@@ -138,8 +144,9 @@ export default function Agendamentos() {
         customerForm.reset();
         setSelectedCustomerId(undefined);
       },
-      onError: () => {
-        toast({ title: 'Erro ao criar agendamento', variant: 'destructive' });
+      onError: (error: any) => {
+        const message = error?.data?.message || 'Erro ao criar agendamento';
+        toast({ title: message, variant: 'destructive' });
       }
     });
   };
@@ -401,7 +408,7 @@ export default function Agendamentos() {
                     <FormField control={form.control} name="appointmentDate" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Data e Hora</FormLabel>
-                        <FormControl><Input type="datetime-local" {...field} /></FormControl>
+                        <FormControl><Input type="datetime-local" step={1800} {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
