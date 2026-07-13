@@ -25,6 +25,7 @@ import Servicos from '@/pages/Servicos';
 import Produtos from '@/pages/Produtos';
 import Inventario from '@/pages/Inventario';
 import Agendamentos from '@/pages/Agendamentos';
+import Orcamentos from '@/pages/Orcamentos';
 import AgendamentoDetail from '@/pages/AgendamentoDetail';
 import Financeiro from '@/pages/Financeiro';
 import Relatorios from '@/pages/Relatorios';
@@ -52,6 +53,7 @@ function AppRouter() {
           <Route path="/login"><Redirect to="/dashboard" /></Route>
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/agendamentos" component={Agendamentos} />
+          <Route path="/orcamentos" component={Orcamentos} />
           <Route path="/agendamentos/:id" component={AgendamentoDetail} />
           <Route path="/clientes" component={Clientes} />
           <Route path="/clientes/:id" component={ClienteDetail} />
@@ -98,6 +100,7 @@ function AppRouter() {
         <Route path="/login"><Redirect to="/dashboard" /></Route>
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/agendamentos" component={Agendamentos} />
+        <Route path="/orcamentos" component={Orcamentos} />
         <Route path="/agendamentos/:id" component={AgendamentoDetail} />
         <Route path="/clientes" component={Clientes} />
         <Route path="/clientes/:id" component={ClienteDetail} />

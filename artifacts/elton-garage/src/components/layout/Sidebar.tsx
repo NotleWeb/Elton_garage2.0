@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'wouter';
 import { 
-  LayoutDashboard, Calendar, Users, Car, Wrench, 
+  LayoutDashboard, Calendar, Users, Car, Wrench, FileText,
   Package, DollarSign, ClipboardList, BarChart3, 
   Award, Bell, Star, UsersRound, Settings 
 } from 'lucide-react';
@@ -16,7 +16,8 @@ const MENU_GROUPS = [
   {
     title: 'Operações',
     items: [
-      { label: 'Agendamentos', href: '/agendamentos', icon: Calendar }
+      { label: 'Agendamentos', href: '/agendamentos', icon: Calendar },
+      { label: 'Orçamentos', href: '/orcamentos', icon: FileText }
     ]
   },
   {

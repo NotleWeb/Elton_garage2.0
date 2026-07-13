@@ -63,7 +63,7 @@ function hashLookupValue(value: unknown): string | null {
 }
 
 function isEncryptedValue(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith(`${ENC_PREFIX}:`);
+  return typeof value === "string" && /^enc:v1:/i.test(value);
 }
 
 function encryptValue(value: unknown): unknown {
@@ -82,7 +82,7 @@ function decryptValue(value: unknown): unknown {
   if (!isEncryptedValue(value)) return value;
 
   const parts = value.split(":");
-  if (parts.length !== 5) return value;
+  if (parts.length !== 5) return null;
 
   try {
     const iv = Buffer.from(parts[2], "base64");
@@ -94,7 +94,8 @@ function decryptValue(value: unknown): unknown {
     const plain = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return plain.toString("utf8");
   } catch {
-    return value;
+    // Do not leak ciphertext to API consumers when key/version is incompatible.
+    return null;
   }
 }
 
