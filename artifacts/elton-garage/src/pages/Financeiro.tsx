@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { 
   useListTransactions, useCreateTransaction, getListTransactionsQueryKey,
-  useGetFinancialSummary, useUpdateTransaction, useDeleteTransaction
+  useGetFinancialSummary, useUpdateTransaction, useDeleteTransaction,
+  getGetFinancialSummaryQueryKey, getGetMonthlyReportQueryKey,
+  getGetServicesReportQueryKey, getGetDashboardKpisQueryKey,
+  getGetRevenueByDayQueryKey, getGetRevenueByMonthQueryKey
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -56,6 +59,18 @@ export default function Financeiro() {
   const updateMutation = useUpdateTransaction();
   const deleteMutation = useDeleteTransaction();
 
+  const invalidateFinancialViews = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getGetFinancialSummaryQueryKey({ month, year }) }),
+      queryClient.invalidateQueries({ queryKey: getGetMonthlyReportQueryKey({ month, year }) }),
+      queryClient.invalidateQueries({ queryKey: getGetServicesReportQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getGetDashboardKpisQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getGetRevenueByDayQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getGetRevenueByMonthQueryKey() }),
+    ]);
+  };
+
   const form = useForm<TransactionForm>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
@@ -83,8 +98,8 @@ export default function Financeiro() {
   const confirmDelete = () => {
     if (showDeleteConfirm === null) return;
     deleteMutation.mutate({ id: showDeleteConfirm }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+      onSuccess: async () => {
+        await invalidateFinancialViews();
         toast({ title: 'Transação removida com sucesso!' });
         setShowDeleteConfirm(null);
       },
@@ -99,8 +114,8 @@ export default function Financeiro() {
 
     if (editingId) {
       updateMutation.mutate({ id: editingId, data: { ...values, date: dateStr } }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+        onSuccess: async () => {
+          await invalidateFinancialViews();
           toast({ title: 'Transação atualizada com sucesso!' });
           setIsCreateOpen(false);
           setEditingId(null);
@@ -110,8 +125,8 @@ export default function Financeiro() {
       });
     } else {
       createMutation.mutate({ data: { ...values, date: dateStr } }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+        onSuccess: async () => {
+          await invalidateFinancialViews();
           toast({ title: 'Transação registrada com sucesso!' });
           setIsCreateOpen(false);
           form.reset();
