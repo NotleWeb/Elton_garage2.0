@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { User, getMe } from '@workspace/api-client-react';
+import { safeStorage } from '@/lib/safe-storage';
 
 interface AuthContextType {
   user: User | null;
@@ -14,7 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('elton_garage_token'));
+  const [token, setToken] = useState<string | null>(safeStorage.getItem('elton_garage_token'));
   const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
 
@@ -30,22 +31,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {
       setToken(null);
       setUser(null);
-      localStorage.removeItem('elton_garage_token');
+      safeStorage.removeItem('elton_garage_token');
     }).finally(() => {
       setIsLoading(false);
     });
   }, [token]);
 
   const login = (newToken: string, newUser: User) => {
-    // Write to localStorage immediately so custom-fetch picks it up on the
+    // Write to safeStorage immediately so custom-fetch picks it up on the
     // very first render after login (before the useEffect can run).
-    localStorage.setItem('elton_garage_token', newToken);
+    safeStorage.setItem('elton_garage_token', newToken);
     setToken(newToken);
     setUser(newUser);
   };
 
   const logout = () => {
-    localStorage.removeItem('elton_garage_token');
+    safeStorage.removeItem('elton_garage_token');
     setToken(null);
     setUser(null);
     setLocation('/login');
