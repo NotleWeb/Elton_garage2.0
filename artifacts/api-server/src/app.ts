@@ -22,7 +22,7 @@ const corsOrigin = allowedOrigins.length > 0
         callback(null, true);
         return;
       }
-      callback(new Error("CORS origin not allowed"));
+      callback(null, false);
     }
   : true;
 
@@ -74,6 +74,10 @@ app.use((req, res, next) => {
 app.use("/api", router);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  if (err.message?.includes("CORS")) {
+    res.status(403).json({ error: "forbidden", message: "Origem nao permitida" });
+    return;
+  }
   logger.error({ err }, "Unhandled error");
   res.status(500).json({ error: "server_error", message: "Erro interno do servidor" });
 });
