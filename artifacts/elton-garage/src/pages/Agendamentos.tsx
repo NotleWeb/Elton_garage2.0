@@ -121,6 +121,18 @@ function normalizeCategory(category?: string): string {
   return 'outros';
 }
 
+function displayPlate(plate?: string | null): string {
+  if (!plate) return 'Sem placa';
+  if (/^enc:v1:/i.test(plate)) return 'Sem placa';
+  return plate.toUpperCase();
+}
+
+function cleanVehicleText(value?: string | null): string {
+  if (!value) return '';
+  if (/^enc:v1:/i.test(value)) return '';
+  return value;
+}
+
 export default function Agendamentos() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
@@ -495,7 +507,7 @@ export default function Agendamentos() {
                       <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value ? String(field.value) : undefined} disabled={!selectedCustomerId || vehicles.length === 0}>
                         <FormControl><SelectTrigger><SelectValue placeholder={!selectedCustomerId ? "Selecione o cliente primeiro" : vehicles.length === 0 ? "Cliente não possui veículos" : "Selecione um veículo"} /></SelectTrigger></FormControl>
                         <SelectContent>
-                          {vehicles.map((v: any) => <SelectItem key={v.id} value={String(v.id)}>{v.brand} {v.model} - {v.plate}</SelectItem>)}
+                          {vehicles.map((v: any) => <SelectItem key={v.id} value={String(v.id)}>{`${cleanVehicleText(v.brand)} ${cleanVehicleText(v.model)}`.trim()} - {displayPlate(v.plate)}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -668,7 +680,7 @@ export default function Agendamentos() {
                     <div className="grid gap-3 md:grid-cols-12 md:items-center">
                       <div className="md:col-span-3 space-y-1">
                         <div className="text-sm font-semibold text-foreground">{formatDateTime(apt.appointmentDate)}</div>
-                        <div className="text-xs text-muted-foreground">{apt.customer?.name || '-'} • {apt.vehicle?.brand} {apt.vehicle?.model} {apt.vehicle?.plate?.toUpperCase()}</div>
+                        <div className="text-xs text-muted-foreground">{apt.customer?.name || '-'} • {cleanVehicleText(apt.vehicle?.brand)} {cleanVehicleText(apt.vehicle?.model)} {displayPlate(apt.vehicle?.plate)}</div>
                       </div>
                       <div className="md:col-span-3">
                         <div className="text-sm font-medium text-foreground">{firstService?.name || '—'}</div>
@@ -691,7 +703,7 @@ export default function Agendamentos() {
                       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                         <span>{formatDateTime(apt.appointmentDate).split(' ')[1]}</span>
                         <span>•</span>
-                        <span>{apt.vehicle?.plate?.toUpperCase()}</span>
+                        <span>{displayPlate(apt.vehicle?.plate)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button

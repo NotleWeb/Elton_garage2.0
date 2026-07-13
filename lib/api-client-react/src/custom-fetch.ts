@@ -10,6 +10,7 @@ export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
+const ENCRYPTED_FIELD_PREFIX = /^\s*enc:v1:/i;
 
 // ---------------------------------------------------------------------------
 // Module-level configuration
@@ -146,6 +147,28 @@ function getStringField(value: unknown, key: string): string | undefined {
 
 function truncate(text: string, maxLength = 300): string {
   return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+function sanitizeEncryptedPayload(value: unknown): unknown {
+  if (typeof value === "string") {
+    return ENCRYPTED_FIELD_PREFIX.test(value) ? "" : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeEncryptedPayload(item));
+  }
+
+  if (value && typeof value === "object") {
+    const plain = Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        sanitizeEncryptedPayload(item),
+      ]),
+    );
+    return plain;
+  }
+
+  return value;
 }
 
 function buildErrorMessage(response: Response, data: unknown): string {
@@ -380,5 +403,11 @@ export async function customFetch<T = unknown>(
     throw new ApiError(response, errorData, requestInfo);
   }
 
-  return (await parseSuccessBody(response, responseType, requestInfo)) as T;
+  const parsed = await parseSuccessBody(response, responseType, requestInfo);
+
+  if (responseType === "blob") {
+    return parsed as T;
+  }
+
+  return sanitizeEncryptedPayload(parsed) as T;
 }
