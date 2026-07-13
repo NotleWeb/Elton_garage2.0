@@ -319,13 +319,13 @@ export default function Financeiro() {
 
           <Card className="border-border">
             <div className="rounded-md overflow-hidden">
-              <div className="bg-muted/50 grid grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
+              <div className="bg-muted/50 hidden md:grid md:grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
                 <div className="col-span-2">Data</div>
                 <div className="col-span-4">Descrição</div>
-                <div className="col-span-2 hidden md:block text-center">Categoria</div>
-                <div className="col-span-1 hidden md:block text-center">Pagamento</div>
-                <div className="col-span-4 md:col-span-2 text-right">Valor</div>
-                <div className="col-span-2 md:col-span-1 text-right">Ações</div>
+                <div className="col-span-2 text-center">Categoria</div>
+                <div className="col-span-1 text-center">Pagamento</div>
+                <div className="col-span-2 text-right">Valor</div>
+                <div className="col-span-1 text-right">Ações</div>
               </div>
               
               <div className="divide-y divide-border">
@@ -335,24 +335,26 @@ export default function Financeiro() {
                   <div className="p-8 text-center text-muted-foreground">Nenhuma transação encontrada.</div>
                 ) : (
                   transactions?.data.map((tx) => (
-                    <div key={tx.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors">
-                      <div className="col-span-2 text-sm text-muted-foreground">
+                    <div key={tx.id} className="flex md:grid md:grid-cols-12 gap-4 p-4 flex-col md:items-center hover:bg-secondary/30 transition-colors">
+                      <div className="text-sm text-muted-foreground md:col-span-2 flex justify-between items-center md:block">
+                        <span className="md:hidden font-medium text-foreground">Data</span>
                         {formatDateTime(tx.date).split(' ')[0]}
                       </div>
-                      <div className="col-span-4">
-                        <p className="font-medium text-foreground truncate">{tx.description}</p>
+                      <div className="md:col-span-4">
+                        <p className="font-medium text-foreground">{tx.description}</p>
                         {tx.appointmentId && <p className="text-xs text-primary">OS #{tx.appointmentId}</p>}
                       </div>
-                      <div className="col-span-2 hidden md:block text-center text-sm text-muted-foreground">
+                      <div className="hidden md:block md:col-span-2 text-center text-sm text-muted-foreground">
                         {tx.category || '-'}
                       </div>
-                      <div className="col-span-1 hidden md:block text-center text-sm text-muted-foreground">
+                      <div className="hidden md:block md:col-span-1 text-center text-sm text-muted-foreground">
                         {getMethodLabel(tx.paymentMethod)}
                       </div>
-                      <div className={`col-span-2 text-right font-bold ${tx.type === 'receita' ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {tx.type === 'receita' ? '+' : '-'}{formatCurrency(tx.amount)}
+                      <div className={`md:col-span-2 font-bold flex justify-between items-center md:block md:text-right ${tx.type === 'receita' ? 'text-emerald-500' : 'text-red-500'}`}>
+                        <span className="md:hidden font-medium text-foreground">Valor</span>
+                        <span>{tx.type === 'receita' ? '+' : '-'}{formatCurrency(tx.amount)}</span>
                       </div>
-                      <div className="col-span-2 md:col-span-1 flex justify-end items-center gap-1">
+                      <div className="md:col-span-1 flex justify-end items-center gap-1">
                         <Button 
                           variant="ghost" 
                           size="icon"

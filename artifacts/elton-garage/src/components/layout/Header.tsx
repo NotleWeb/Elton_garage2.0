@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useLogout, useListNotifications } from '@workspace/api-client-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { NotificationToggle } from '@/components/notification-toggle';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -35,7 +36,8 @@ export function Header() {
         <SidebarTrigger className="md:hidden text-muted-foreground hover:text-foreground" />
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
+        <NotificationToggle />
         <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
