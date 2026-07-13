@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { secureDataForRead } from "../lib/data-security.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -59,7 +60,10 @@ router.get("/:id", async (req, res) => {
     db.collection("loyalty_cards").where("customer_id", "==", customerId).limit(1).get(),
   ]);
 
-  const vehicles = vehiclesSnap.docs.map((d) => ({ id: Number(d.id), ...d.data() })) as any[];
+  const vehicles = vehiclesSnap.docs.map((d) => ({
+    id: Number(d.id),
+    ...secureDataForRead("vehicles", d.data() as Record<string, unknown>),
+  })) as any[];
   const loyalty = loyaltySnap.empty ? null : { id: Number(loyaltySnap.docs[0].id), ...loyaltySnap.docs[0].data() } as any;
 
   res.json({
@@ -139,7 +143,10 @@ router.delete("/:id", async (req, res) => {
 router.get("/:id/vehicles", async (req, res) => {
   const customerId = Number(req.params.id);
   const snap = await db.collection("vehicles").where("customer_id", "==", customerId).get();
-  const vehicles = snap.docs.map((d) => ({ id: Number(d.id), ...d.data() })) as any[];
+  const vehicles = snap.docs.map((d) => ({
+    id: Number(d.id),
+    ...secureDataForRead("vehicles", d.data() as Record<string, unknown>),
+  })) as any[];
   const customer = await getById("customers", customerId) as any;
   res.json(vehicles.map((v) => ({
     id: v.id, customerId: v.customer_id, brand: v.brand, model: v.model,
