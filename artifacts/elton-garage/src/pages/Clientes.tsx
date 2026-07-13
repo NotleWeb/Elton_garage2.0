@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
-import { useListCustomers, useCreateCustomer, useDeleteCustomer, getListCustomersQueryKey } from '@workspace/api-client-react';
+import { useListCustomers, useCreateCustomer, useCreateVehicle, useDeleteCustomer, getListCustomersQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { Search, Plus, Loader2, ChevronRight, Phone, Trash2 } from 'lucide-react';
@@ -24,6 +25,29 @@ const customerSchema = z.object({
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   address: z.string().optional(),
   notes: z.string().optional(),
+  vehicleBrand: z.string().optional(),
+  vehicleModel: z.string().optional(),
+  vehicleYear: z.coerce.number().optional(),
+  vehiclePlate: z.string().optional(),
+  vehicleColor: z.string().optional(),
+  vehicleFuel: z.enum(['gasolina', 'etanol', 'flex', 'diesel', 'gnv', 'eletrico', 'hibrido']).optional(),
+  vehicleNotes: z.string().optional(),
+}).refine((values) => {
+  const hasAnyVehicleField = Boolean(
+    values.vehicleBrand ||
+    values.vehicleModel ||
+    values.vehicleYear ||
+    values.vehiclePlate ||
+    values.vehicleColor ||
+    values.vehicleFuel ||
+    values.vehicleNotes
+  );
+
+  if (!hasAnyVehicleField) return true;
+  return Boolean(values.vehicleBrand && values.vehicleModel);
+}, {
+  message: 'Para cadastrar veículo junto, informe ao menos marca e modelo',
+  path: ['vehicleBrand'],
 });
 
 type CustomerForm = z.infer<typeof customerSchema>;
@@ -47,20 +71,58 @@ export default function Clientes() {
   });
 
   const createMutation = useCreateCustomer();
+  const createVehicleMutation = useCreateVehicle();
   const deleteMutation = useDeleteCustomer();
 
   const form = useForm<CustomerForm>({
     resolver: zodResolver(customerSchema),
     defaultValues: {
-      name: '', phone: '', whatsapp: '', email: '', address: '', notes: ''
+      name: '', phone: '', whatsapp: '', email: '', address: '', notes: '',
+      vehicleBrand: '', vehicleModel: '', vehiclePlate: '', vehicleColor: '', vehicleFuel: undefined, vehicleNotes: ''
     }
   });
 
   const onSubmit = (values: CustomerForm) => {
-    createMutation.mutate({ data: values }, {
-      onSuccess: () => {
+    const {
+      vehicleBrand,
+      vehicleModel,
+      vehicleYear,
+      vehiclePlate,
+      vehicleColor,
+      vehicleFuel,
+      vehicleNotes,
+      ...customerData
+    } = values;
+
+    const vehicleBrandValue = vehicleBrand?.trim();
+    const vehicleModelValue = vehicleModel?.trim();
+    const shouldCreateVehicle = Boolean(vehicleBrandValue && vehicleModelValue);
+
+    createMutation.mutate({ data: customerData }, {
+      onSuccess: async (createdCustomer: any) => {
+        if (shouldCreateVehicle) {
+          try {
+            await createVehicleMutation.mutateAsync({
+              data: {
+                customerId: createdCustomer.id,
+                brand: vehicleBrandValue!,
+                model: vehicleModelValue!,
+                year: vehicleYear,
+                plate: vehiclePlate,
+                color: vehicleColor,
+                fuel: vehicleFuel,
+                notes: vehicleNotes,
+              }
+            });
+            toast({ title: 'Cliente e veículo cadastrados com sucesso!' });
+          } catch {
+            toast({ title: 'Cliente cadastrado, mas houve erro ao cadastrar o veículo', variant: 'destructive' });
+          }
+        } else {
+          toast({ title: 'Cliente cadastrado com sucesso!' });
+        }
+
         queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
-        toast({ title: 'Cliente cadastrado com sucesso!' });
         setIsCreateOpen(false);
         form.reset();
       },
@@ -87,11 +149,11 @@ export default function Clientes() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <h1 className="page-title">Clientes</h1>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="page-actions">
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -132,10 +194,55 @@ export default function Clientes() {
                   <FormField control={form.control} name="notes" render={({ field }) => (
                     <FormItem><FormLabel>Observações</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
+
+                  <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-4">
+                    <h3 className="text-sm font-semibold text-foreground">Cadastrar veículo junto (opcional)</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField control={form.control} name="vehicleBrand" render={({ field }) => (
+                        <FormItem><FormLabel>Marca</FormLabel><FormControl><Input placeholder="Ex: VW" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="vehicleModel" render={({ field }) => (
+                        <FormItem><FormLabel>Modelo</FormLabel><FormControl><Input placeholder="Ex: Polo" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField control={form.control} name="vehicleYear" render={({ field }) => (
+                        <FormItem><FormLabel>Ano</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="vehiclePlate" render={({ field }) => (
+                        <FormItem><FormLabel>Placa</FormLabel><FormControl><Input placeholder="ABC-1234" {...field} className="uppercase" /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name="vehicleColor" render={({ field }) => (
+                        <FormItem><FormLabel>Cor</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    </div>
+                    <FormField control={form.control} name="vehicleFuel" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Combustível</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="gasolina">Gasolina</SelectItem>
+                            <SelectItem value="etanol">Etanol</SelectItem>
+                            <SelectItem value="flex">Flex</SelectItem>
+                            <SelectItem value="diesel">Diesel</SelectItem>
+                            <SelectItem value="gnv">GNV</SelectItem>
+                            <SelectItem value="eletrico">Elétrico</SelectItem>
+                            <SelectItem value="hibrido">Híbrido</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="vehicleNotes" render={({ field }) => (
+                      <FormItem><FormLabel>Observações do veículo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+
                   <div className="flex justify-end gap-2 pt-4">
                     <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                    <Button type="submit" disabled={createMutation.isPending}>
-                      {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    <Button type="submit" disabled={createMutation.isPending || createVehicleMutation.isPending}>
+                      {(createMutation.isPending || createVehicleMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Salvar Cliente
                     </Button>
                   </div>

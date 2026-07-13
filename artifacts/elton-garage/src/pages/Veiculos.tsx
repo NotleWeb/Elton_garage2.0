@@ -70,11 +70,11 @@ export default function Veiculos() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Veículos</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <h1 className="page-title">Veículos</h1>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="page-actions">
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 

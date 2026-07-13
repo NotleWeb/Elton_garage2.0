@@ -14,6 +14,7 @@ import { setBaseUrl } from '@workspace/api-client-react';
 // Em desenvolvimento (Replit): deixe vazio — usa URLs relativas automaticamente.
 const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
 if (apiUrl) setBaseUrl(apiUrl);
+const skipLoginMode = import.meta.env.VITE_SKIP_LOGIN === 'true';
 
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
@@ -42,6 +43,34 @@ function Redirect({ to }: { to: string }) {
 
 function AppRouter() {
   const { token, isLoading } = useAuth();
+
+  if (skipLoginMode) {
+    return (
+      <AppLayout>
+        <Switch>
+          <Route path="/" ><Redirect to="/dashboard" /></Route>
+          <Route path="/login"><Redirect to="/dashboard" /></Route>
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/agendamentos" component={Agendamentos} />
+          <Route path="/agendamentos/:id" component={AgendamentoDetail} />
+          <Route path="/clientes" component={Clientes} />
+          <Route path="/clientes/:id" component={ClienteDetail} />
+          <Route path="/veiculos" component={Veiculos} />
+          <Route path="/servicos" component={Servicos} />
+          <Route path="/produtos" component={Produtos} />
+          <Route path="/inventario" component={Inventario} />
+          <Route path="/financeiro" component={Financeiro} />
+          <Route path="/relatorios" component={Relatorios} />
+          <Route path="/fidelidade" component={Fidelidade} />
+          <Route path="/notificacoes" component={Notificacoes} />
+          <Route path="/avaliacoes" component={Avaliacoes} />
+          <Route path="/usuarios" component={Usuarios} />
+          <Route path="/configuracoes" component={Configuracoes} />
+          <Route component={NotFound} />
+        </Switch>
+      </AppLayout>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -90,6 +119,14 @@ function AppRouter() {
 }
 
 function App() {
+  useEffect(() => {
+    if (skipLoginMode) {
+      localStorage.setItem('elton_garage_skip_login', 'true');
+    } else {
+      localStorage.removeItem('elton_garage_skip_login');
+    }
+  }, []);
+
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } }
   });

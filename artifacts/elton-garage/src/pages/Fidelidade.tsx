@@ -34,10 +34,10 @@ export default function Fidelidade() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="page-shell">
+      <div className="page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fidelidade</h1>
+          <h1 className="page-title">Fidelidade</h1>
           <p className="text-muted-foreground">Acompanhe as cartelas de fidelidade dos clientes</p>
         </div>
         

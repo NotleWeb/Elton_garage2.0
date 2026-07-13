@@ -163,11 +163,11 @@ export default function Notificacoes() {
   const activeTypeLabel = TYPE_FILTERS.find((t) => t.value === typeFilter)?.label ?? 'Todos os tipos';
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="page-shell">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <h1 className="page-title flex items-center gap-3">
             <Bell className="w-8 h-8" /> Central de Notificações
           </h1>
           {data && (

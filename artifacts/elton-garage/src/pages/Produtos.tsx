@@ -91,11 +91,11 @@ export default function Produtos() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Produtos & Estoque</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <h1 className="page-title">Produtos & Estoque</h1>
         
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="page-actions gap-3">
           <div className="flex items-center space-x-2 bg-secondary/50 px-3 py-1.5 rounded-md border border-border">
             <Switch id="low-stock" checked={showLowStock} onCheckedChange={setShowLowStock} />
             <label htmlFor="low-stock" className="text-sm font-medium cursor-pointer text-muted-foreground hover:text-foreground transition-colors">

@@ -24,10 +24,10 @@ export default function Relatorios() {
   const { data: servicesRep, isLoading: svcLoading } = useGetServicesReport({ dateFrom: firstDay, dateTo: lastDay });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="page-shell">
+      <div className="page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Relatórios e Métricas</h1>
+          <h1 className="page-title">Relatórios e Métricas</h1>
           <p className="text-muted-foreground">Análise de desempenho do negócio</p>
         </div>
         

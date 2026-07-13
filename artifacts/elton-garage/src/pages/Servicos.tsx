@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-  useListServices, useCreateService, useDeleteService, getListServicesQueryKey 
+  useListServices, useCreateService, useUpdateService, useDeleteService, getListServicesQueryKey 
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils';
@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
-import { Search, Plus, Wrench, Loader2, Clock, Trash2 } from 'lucide-react';
+import { Search, Plus, Wrench, Loader2, Clock, Trash2, Pencil } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -37,6 +37,7 @@ export default function Servicos() {
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -48,6 +49,7 @@ export default function Servicos() {
   });
 
   const createMutation = useCreateService();
+  const updateMutation = useUpdateService();
   const deleteMutation = useDeleteService();
 
   const form = useForm<ServiceForm>({
@@ -58,6 +60,22 @@ export default function Servicos() {
   });
 
   const onSubmit = (values: ServiceForm) => {
+    if (editingId !== null) {
+      updateMutation.mutate({ id: editingId, data: values }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListServicesQueryKey() });
+          toast({ title: 'Serviço atualizado com sucesso!' });
+          setIsCreateOpen(false);
+          setEditingId(null);
+          form.reset();
+        },
+        onError: () => {
+          toast({ title: 'Erro ao atualizar serviço', variant: 'destructive' });
+        }
+      });
+      return;
+    }
+
     createMutation.mutate({ data: values }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListServicesQueryKey() });
@@ -69,6 +87,20 @@ export default function Servicos() {
         toast({ title: 'Erro ao cadastrar serviço', variant: 'destructive' });
       }
     });
+  };
+
+  const handleEdit = (service: any) => {
+    setEditingId(service.id);
+    form.reset({
+      name: service.name ?? '',
+      description: service.description ?? '',
+      price: Number(service.price ?? 0),
+      estimatedDuration: service.estimatedDuration ?? 60,
+      category: service.category ?? 'Outros',
+      vehicleType: service.vehicleType ?? 'todos',
+      active: Boolean(service.active),
+    });
+    setIsCreateOpen(true);
   };
 
   const handleDelete = () => {
@@ -96,11 +128,11 @@ export default function Servicos() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Catálogo de Serviços</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <h1 className="page-title">Catálogo de Serviços</h1>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="page-actions">
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -111,13 +143,21 @@ export default function Servicos() {
             />
           </div>
           
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+            setIsCreateOpen(open);
+            if (!open) {
+              setEditingId(null);
+              form.reset({
+                name: '', description: '', price: 0, estimatedDuration: 60, category: 'Lavagem', vehicleType: 'todos', active: true
+              });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="shrink-0"><Plus className="w-4 h-4 mr-2" /> Novo Serviço</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Cadastrar Novo Serviço</DialogTitle>
+                <DialogTitle>{editingId !== null ? 'Editar Serviço' : 'Cadastrar Novo Serviço'}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
@@ -136,7 +176,7 @@ export default function Servicos() {
                     <FormField control={form.control} name="category" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Categoria</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="Lavagem">Lavagem</SelectItem>
@@ -152,7 +192,7 @@ export default function Servicos() {
                     <FormField control={form.control} name="vehicleType" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tipo de Veículo</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="todos">Todos</SelectItem>
@@ -184,7 +224,10 @@ export default function Servicos() {
                   )} />
                   <div className="flex justify-end gap-2 pt-4">
                     <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                    <Button type="submit" disabled={createMutation.isPending}>Salvar Serviço</Button>
+                    <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                      {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {editingId !== null ? 'Salvar Alterações' : 'Salvar Serviço'}
+                    </Button>
                   </div>
                 </form>
               </Form>
@@ -236,7 +279,16 @@ export default function Servicos() {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-border flex justify-end">
+                <div className="mt-4 pt-3 border-t border-border flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 px-2"
+                    onClick={() => handleEdit(service)}
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                    Editar
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

@@ -3,7 +3,7 @@ import { Link } from 'wouter';
 import {
   useListAppointments, useCreateAppointment, getListAppointmentsQueryKey,
   useListCustomers, useCreateCustomer, getListCustomersQueryKey,
-  useListServices, useListCustomerVehicles, useUpdateAppointmentStatus,
+  useCreateVehicle, useListServices, useListCustomerVehicles, getListCustomerVehiclesQueryKey, useUpdateAppointmentStatus,
   getGetDashboardKpisQueryKey, useDeleteAppointment
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -38,6 +38,28 @@ const customerSchema = z.object({
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   address: z.string().optional(),
   notes: z.string().optional(),
+  vehicleBrand: z.string().optional(),
+  vehicleModel: z.string().optional(),
+  vehicleYear: z.coerce.number().optional(),
+  vehiclePlate: z.string().optional(),
+  vehicleColor: z.string().optional(),
+  vehicleFuel: z.enum(['gasolina', 'etanol', 'flex', 'diesel', 'gnv', 'eletrico', 'hibrido']).optional(),
+  vehicleNotes: z.string().optional(),
+}).refine((values) => {
+  const hasAnyVehicleField = Boolean(
+    values.vehicleBrand ||
+    values.vehicleModel ||
+    values.vehicleYear ||
+    values.vehiclePlate ||
+    values.vehicleColor ||
+    values.vehicleFuel ||
+    values.vehicleNotes
+  );
+  if (!hasAnyVehicleField) return true;
+  return Boolean(values.vehicleBrand && values.vehicleModel);
+}, {
+  message: 'Para cadastrar veículo junto, informe ao menos marca e modelo',
+  path: ['vehicleBrand'],
 });
 
 type CustomerForm = z.infer<typeof customerSchema>;
@@ -75,6 +97,30 @@ const STATUS_LABELS: Record<string, string> = {
   cancelado: 'Cancelado',
 };
 
+const CATEGORY_ORDER = ['lavagem', 'polimento', 'higienizacao', 'estetica', 'outros'];
+const CATEGORY_LABELS: Record<string, string> = {
+  lavagem: 'Lavagem',
+  polimento: 'Polimento',
+  higienizacao: 'Higienização',
+  estetica: 'Estética',
+  outros: 'Outros',
+};
+
+function normalizeCategory(category?: string): string {
+  if (!category) return 'outros';
+  const normalized = category
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (normalized.includes('lavagem')) return 'lavagem';
+  if (normalized.includes('polimento')) return 'polimento';
+  if (normalized.includes('higienizacao')) return 'higienizacao';
+  if (normalized.includes('estetica')) return 'estetica';
+  return 'outros';
+}
+
 export default function Agendamentos() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
@@ -103,13 +149,15 @@ export default function Agendamentos() {
 
   const createMutation = useCreateAppointment();
   const createCustomerMutation = useCreateCustomer();
+  const createVehicleMutation = useCreateVehicle();
   const statusMutation = useUpdateAppointmentStatus();
   const deleteMutation = useDeleteAppointment();
 
   const customerForm = useForm<CustomerForm>({
     resolver: zodResolver(customerSchema),
     defaultValues: {
-      name: '', phone: '', whatsapp: '', email: '', address: '', notes: ''
+      name: '', phone: '', whatsapp: '', email: '', address: '', notes: '',
+      vehicleBrand: '', vehicleModel: '', vehiclePlate: '', vehicleColor: '', vehicleFuel: undefined, vehicleNotes: ''
     }
   });
 
@@ -129,6 +177,18 @@ export default function Agendamentos() {
   const estimatedTotal = Math.max(0, subtotal - watchedDiscount);
   const durationHours = Math.floor(totalMinutes / 60);
   const durationMins = totalMinutes % 60;
+  const allServices = services?.data || [];
+  const servicesByCategory = allServices.reduce((acc, service) => {
+    const key = normalizeCategory(service.category);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(service);
+    return acc;
+  }, {} as Record<string, typeof allServices>);
+  const orderedCategoryKeys = Object.keys(servicesByCategory).sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
 
   const onSubmit = (values: AppointmentForm) => {
     let dateStr = values.appointmentDate;
@@ -182,11 +242,11 @@ export default function Agendamentos() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Agendamentos</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <h1 className="page-title">Agendamentos</h1>
 
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="page-actions gap-3">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Filtrar status" />
@@ -297,24 +357,131 @@ export default function Agendamentos() {
                               <FormMessage />
                             </FormItem>
                           )} />
+
+                          <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-4">
+                            <h3 className="text-sm font-semibold text-foreground">Cadastrar veículo junto (opcional)</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField control={customerForm.control} name="vehicleBrand" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Marca</FormLabel>
+                                  <FormControl><Input placeholder="Ex: VW" {...field} /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )} />
+                              <FormField control={customerForm.control} name="vehicleModel" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Modelo</FormLabel>
+                                  <FormControl><Input placeholder="Ex: Polo" {...field} /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )} />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <FormField control={customerForm.control} name="vehicleYear" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Ano</FormLabel>
+                                  <FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )} />
+                              <FormField control={customerForm.control} name="vehiclePlate" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Placa</FormLabel>
+                                  <FormControl><Input placeholder="ABC-1234" {...field} className="uppercase" /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )} />
+                              <FormField control={customerForm.control} name="vehicleColor" render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Cor</FormLabel>
+                                  <FormControl><Input {...field} /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )} />
+                            </div>
+                            <FormField control={customerForm.control} name="vehicleFuel" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Combustível</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="gasolina">Gasolina</SelectItem>
+                                    <SelectItem value="etanol">Etanol</SelectItem>
+                                    <SelectItem value="flex">Flex</SelectItem>
+                                    <SelectItem value="diesel">Diesel</SelectItem>
+                                    <SelectItem value="gnv">GNV</SelectItem>
+                                    <SelectItem value="eletrico">Elétrico</SelectItem>
+                                    <SelectItem value="hibrido">Híbrido</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={customerForm.control} name="vehicleNotes" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Observações do veículo</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          </div>
+
                           <div className="flex gap-2 justify-end">
                             <Button type="button" variant="outline" onClick={() => setIsNewCustomerOpen(false)}>Cancelar</Button>
-                            <Button type="button" onClick={() => {
-                              customerForm.handleSubmit((values) => {
-                                createCustomerMutation.mutate({ data: values }, {
-                                  onSuccess: (customer) => {
-                                    queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+                            <Button type="button" disabled={createCustomerMutation.isPending || createVehicleMutation.isPending} onClick={() => {
+                              customerForm.handleSubmit(async (values) => {
+                                const {
+                                  vehicleBrand,
+                                  vehicleModel,
+                                  vehicleYear,
+                                  vehiclePlate,
+                                  vehicleColor,
+                                  vehicleFuel,
+                                  vehicleNotes,
+                                  ...customerData
+                                } = values;
+
+                                const brand = vehicleBrand?.trim();
+                                const model = vehicleModel?.trim();
+                                const shouldCreateVehicle = Boolean(brand && model);
+
+                                try {
+                                  const customer = await createCustomerMutation.mutateAsync({ data: customerData as any });
+                                  queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+                                  setSelectedCustomerId(customer.id);
+                                  form.setValue('customerId', customer.id);
+
+                                  if (shouldCreateVehicle) {
+                                    const vehicle = await createVehicleMutation.mutateAsync({
+                                      data: {
+                                        customerId: customer.id,
+                                        brand: brand!,
+                                        model: model!,
+                                        year: vehicleYear,
+                                        plate: vehiclePlate,
+                                        color: vehicleColor,
+                                        fuel: vehicleFuel,
+                                        notes: vehicleNotes,
+                                      } as any
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: getListCustomerVehiclesQueryKey(customer.id) });
+                                    form.setValue('vehicleId', vehicle.id);
+                                    toast({ title: 'Cliente e veículo criados com sucesso!' });
+                                  } else {
+                                    form.setValue('vehicleId', 0);
                                     toast({ title: 'Cliente criado com sucesso!' });
-                                    setSelectedCustomerId(customer.id);
-                                    form.setValue('customerId', customer.id);
-                                    setIsNewCustomerOpen(false);
-                                  },
-                                  onError: () => {
-                                    toast({ title: 'Erro ao criar cliente', variant: 'destructive' });
                                   }
-                                });
+
+                                  customerForm.reset();
+                                  setIsNewCustomerOpen(false);
+                                } catch {
+                                  toast({ title: 'Erro ao criar cliente', variant: 'destructive' });
+                                }
                               })();
-                            }}>Salvar cliente</Button>
+                            }}>
+                              {(createCustomerMutation.isPending || createVehicleMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                              Salvar cliente
+                            </Button>
                           </div>
                         </div>
                       </Form>
@@ -375,25 +542,24 @@ export default function Agendamentos() {
                               <CommandInput placeholder="Pesquisar serviço..." />
                               <CommandList>
                                 <CommandEmpty>Nenhum serviço encontrado.</CommandEmpty>
-                                <CommandGroup>
-                                  {services?.data.map(s => {
-                                    const selected = field.value.includes(s.id);
-                                    return (
-                                      <CommandItem
-                                        key={s.id}
-                                        value={s.name}
-                                        onSelect={() => toggleService(s.id, field.value, field.onChange)}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", selected ? "opacity-100 text-primary" : "opacity-0")} />
-                                        <span className="flex-1">{s.name}</span>
-                                        {s.category && (
-                                          <span className="text-xs text-muted-foreground mr-3">{s.category}</span>
-                                        )}
-                                        <span className="text-sm font-medium text-primary">{formatCurrency(s.price)}</span>
-                                      </CommandItem>
-                                    );
-                                  })}
-                                </CommandGroup>
+                                {orderedCategoryKeys.map((categoryKey) => (
+                                  <CommandGroup key={categoryKey} heading={CATEGORY_LABELS[categoryKey] || 'Outros'}>
+                                    {servicesByCategory[categoryKey].map(s => {
+                                      const selected = field.value.includes(s.id);
+                                      return (
+                                        <CommandItem
+                                          key={s.id}
+                                          value={`${s.name} ${s.category || ''}`}
+                                          onSelect={() => toggleService(s.id, field.value, field.onChange)}
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4", selected ? "opacity-100 text-primary" : "opacity-0")} />
+                                          <span className="flex-1">{s.name}</span>
+                                          <span className="text-sm font-medium text-primary">{formatCurrency(s.price)}</span>
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                ))}
                               </CommandList>
                             </Command>
                           </PopoverContent>
