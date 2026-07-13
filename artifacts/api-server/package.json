@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "node -e \"const {spawnSync}=require('node:child_process'); process.env.NODE_ENV='development'; const build=spawnSync('pnpm',['run','build'],{stdio:'inherit',shell:true,env:process.env}); if(build.status!==0) process.exit(build.status??1); const start=spawnSync('pnpm',['run','start'],{stdio:'inherit',shell:true,env:process.env}); process.exit(start.status??1);\"",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"

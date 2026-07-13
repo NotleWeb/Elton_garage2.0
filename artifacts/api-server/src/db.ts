@@ -1,17 +1,24 @@
-import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { initializeApp, cert, applicationDefault, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import bcrypt from "bcryptjs";
 import { SECURED_COLLECTIONS, secureDataForRead, secureDataForWrite } from "./lib/data-security.js";
+import { readFileSync } from "node:fs";
 
 // ---------------------------------------------------------------------------
 // Firebase Admin init
 // ---------------------------------------------------------------------------
 
-const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-if (!svcJson) throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON environment variable is required");
-
 if (!getApps().length) {
-  initializeApp({ credential: cert(JSON.parse(svcJson)) });
+  const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const svcPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+
+  if (svcJson) {
+    initializeApp({ credential: cert(JSON.parse(svcJson)) });
+  } else if (svcPath) {
+    initializeApp({ credential: cert(JSON.parse(readFileSync(svcPath, "utf8"))) });
+  } else {
+    initializeApp({ credential: applicationDefault() });
+  }
 }
 
 export const db = getFirestore();
