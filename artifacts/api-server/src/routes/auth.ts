@@ -1,7 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { db } from "../db.js";
+import { db, getById } from "../db.js";
+import { getLookupHash } from "../lib/data-security.js";
 
 const router = Router();
 
@@ -17,17 +18,39 @@ router.post("/login", async (req, res) => {
     res.status(400).json({ error: "validation", message: "Email e senha sao obrigatorios" });
     return;
   }
-  const snap = await db.collection("users")
-    .where("email", "==", email)
+  const emailHash = getLookupHash(email);
+  if (!emailHash) {
+    res.status(400).json({ error: "validation", message: "Email invalido" });
+    return;
+  }
+
+  let snap = await db.collection("users")
+    .where("email_hash", "==", emailHash)
     .where("active", "==", 1)
     .limit(1)
     .get();
+
+  if (snap.empty) {
+    // Compatibilidade temporaria para registros antigos sem hash de email.
+    snap = await db.collection("users")
+      .where("email", "==", email)
+      .where("active", "==", 1)
+      .limit(1)
+      .get();
+  }
+
   if (snap.empty) {
     res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
     return;
   }
+
   const doc = snap.docs[0];
-  const user = { id: Number(doc.id), ...doc.data() } as any;
+  const user = await getById("users", Number(doc.id)) as any;
+  if (!user) {
+    res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
+    return;
+  }
+
   if (!bcrypt.compareSync(password, user.password_hash)) {
     res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
     return;
@@ -40,6 +63,7 @@ router.post("/login", async (req, res) => {
   res.cookie("token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
   res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
@@ -59,12 +83,11 @@ router.get("/me", async (req, res) => {
   }
   try {
     const payload = jwt.verify(token, getJwtSecret()) as any;
-    const doc = await db.collection("users").doc(String(payload.userId)).get();
-    if (!doc.exists) {
+    const user = await getById("users", Number(payload.userId)) as any;
+    if (!user) {
       res.status(404).json({ error: "not_found", message: "Usuario nao encontrado" });
       return;
     }
-    const user = { id: Number(doc.id), ...doc.data() } as any;
     if (!user.active) {
       res.status(401).json({ error: "auth", message: "Usuario inativo" });
       return;

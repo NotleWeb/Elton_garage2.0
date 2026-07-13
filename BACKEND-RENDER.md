@@ -15,6 +15,17 @@ Variáveis de ambiente necessárias:
 - `SESSION_SECRET`
   - string aleatória para assinar tokens/sessões
   - deve estar definida no serviço Render antes de iniciar
+- `DATA_ENCRYPTION_KEY`
+   - chave usada para criptografar dados sensíveis em repouso (AES-256-GCM)
+   - recomendado usar uma chave de 32 bytes em Base64
+   - exemplo para gerar: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+- `ALLOWED_ORIGINS`
+   - lista de domínios permitidos para CORS, separados por vírgula
+   - exemplo: `https://app.seudominio.com,https://www.seudominio.com`
+- `RUN_DATA_SECURITY_MIGRATION`
+   - opcional (`true`/`false`)
+   - quando `true`, executa uma migração em lote no boot para criptografar dados legados
+   - use uma vez e depois volte para `false` para reduzir tempo de inicialização
 - `NODE_ENV`
   - `production` (recomendado)
 
@@ -65,6 +76,9 @@ Se o Render não usar automaticamente o `render.yaml`, copie essas configuraçõ
    - `PORT=3001`
    - `FIREBASE_SERVICE_ACCOUNT_JSON={...json...}`
    - `SESSION_SECRET=algumsegredoforte`
+   - `DATA_ENCRYPTION_KEY=<chave-base64-32-bytes>`
+   - `ALLOWED_ORIGINS=http://localhost:5173`
+   - `RUN_DATA_SECURITY_MIGRATION=false`
 
 2. Execute:
    ```powershell
