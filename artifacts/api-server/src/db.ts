@@ -1,6 +1,7 @@
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import bcrypt from "bcryptjs";
+import { SECURED_COLLECTIONS, secureDataForRead, secureDataForWrite } from "./lib/data-security.js";
 
 // ---------------------------------------------------------------------------
 // Firebase Admin init
@@ -39,30 +40,37 @@ export async function nextId(collection: string): Promise<number> {
 export async function getById<T = any>(col: string, id: number): Promise<T | null> {
   const snap = await db.collection(col).doc(String(id)).get();
   if (!snap.exists) return null;
-  return { id, ...snap.data() } as T;
+  const data = secureDataForRead(col, snap.data() as Record<string, unknown>);
+  return { id, ...data } as T;
 }
 
 /** Get all documents from a collection (integer id field included). */
 export async function getAll<T = any>(col: string): Promise<T[]> {
   const snap = await db.collection(col).get();
-  return snap.docs.map((d) => ({ id: Number(d.id), ...d.data() })) as T[];
+  return snap.docs.map((d) => {
+    const data = secureDataForRead(col, d.data() as Record<string, unknown>);
+    return { id: Number(d.id), ...data };
+  }) as T[];
 }
 
 /** Create a document with auto-assigned integer ID. */
 export async function createDoc<T = any>(col: string, data: Record<string, any>): Promise<T> {
   const id = await nextId(col);
-  await db.collection(col).doc(String(id)).set({ ...data });
-  return { id, ...data } as T;
+  const writeData = secureDataForWrite(col, { ...data });
+  await db.collection(col).doc(String(id)).set(writeData);
+  return { id, ...secureDataForRead(col, writeData) } as T;
 }
 
 /** Full overwrite of a document. */
 export async function setDocById(col: string, id: number, data: Record<string, any>): Promise<void> {
-  await db.collection(col).doc(String(id)).set(data);
+  const writeData = secureDataForWrite(col, data);
+  await db.collection(col).doc(String(id)).set(writeData);
 }
 
 /** Partial update of a document. */
 export async function updateDocById(col: string, id: number, data: Record<string, any>): Promise<void> {
-  await db.collection(col).doc(String(id)).update(data);
+  const writeData = secureDataForWrite(col, data);
+  await db.collection(col).doc(String(id)).update(writeData);
 }
 
 /** Delete a document by integer ID. */
@@ -92,5 +100,39 @@ export async function initDb(): Promise<void> {
       created_at: nowIso(),
       updated_at: nowIso(),
     });
+  }
+
+  if ((process.env["RUN_DATA_SECURITY_MIGRATION"] ?? "false").toLowerCase() === "true") {
+    await migrateSensitiveData();
+  }
+}
+
+async function migrateSensitiveData(): Promise<void> {
+  for (const collectionName of SECURED_COLLECTIONS) {
+    const snap = await db.collection(collectionName).get();
+    if (snap.empty) continue;
+
+    let pendingWrites = 0;
+    let batch = db.batch();
+
+    for (const doc of snap.docs) {
+      const raw = doc.data() as Record<string, any>;
+      const secured = secureDataForWrite(collectionName, raw);
+
+      if (JSON.stringify(raw) === JSON.stringify(secured)) continue;
+
+      batch.set(doc.ref, secured, { merge: true });
+      pendingWrites += 1;
+
+      if (pendingWrites >= 300) {
+        await batch.commit();
+        batch = db.batch();
+        pendingWrites = 0;
+      }
+    }
+
+    if (pendingWrites > 0) {
+      await batch.commit();
+    }
   }
 }

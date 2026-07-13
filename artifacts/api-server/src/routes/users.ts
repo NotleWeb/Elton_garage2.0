@@ -1,7 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
+import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getLookupHash } from "../lib/data-security.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -34,11 +35,27 @@ router.post("/", async (req, res) => {
     res.status(400).json({ error: "validation", message: "Campos obrigatorios faltando" });
     return;
   }
-  const all = await getAll("users");
-  if ((all as any[]).some((u: any) => u.email === email)) {
+
+  const emailHash = getLookupHash(email);
+  if (!emailHash) {
+    res.status(400).json({ error: "validation", message: "Email invalido" });
+    return;
+  }
+
+  const existingByHash = await db
+    .collection("users")
+    .where("email_hash", "==", emailHash)
+    .limit(1)
+    .get();
+
+  const allUsers = await getAll("users");
+  const existsLegacy = (allUsers as any[]).some((u: any) => (u.email ?? "") === email);
+
+  if (!existingByHash.empty || existsLegacy) {
     res.status(400).json({ error: "conflict", message: "Email ja cadastrado" });
     return;
   }
+
   const hash = bcrypt.hashSync(password, 10);
   const user = await createDoc("users", {
     name, email, password_hash: hash, role, active: 1,
@@ -58,6 +75,29 @@ router.put("/:id", async (req, res) => {
   const user = await getById("users", id) as any;
   if (!user) { res.status(404).json({ error: "not_found", message: "Usuario nao encontrado" }); return; }
   const { name, email, password, role, active } = req.body as any;
+
+  if (email !== undefined) {
+    const emailHash = getLookupHash(email);
+    if (!emailHash) {
+      res.status(400).json({ error: "validation", message: "Email invalido" });
+      return;
+    }
+    const existingByHash = await db
+      .collection("users")
+      .where("email_hash", "==", emailHash)
+      .limit(5)
+      .get();
+    const conflict = existingByHash.docs.some((d) => Number(d.id) !== id);
+
+    const allUsers = await getAll("users");
+    const legacyConflict = (allUsers as any[]).some((u: any) => u.id !== id && (u.email ?? "") === email);
+
+    if (conflict || legacyConflict) {
+      res.status(400).json({ error: "conflict", message: "Email ja cadastrado" });
+      return;
+    }
+  }
+
   const newHash = password ? bcrypt.hashSync(password, 10) : user.password_hash;
   await updateDocById("users", id, {
     name: name ?? user.name,
