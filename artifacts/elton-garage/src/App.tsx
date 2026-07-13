@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { useEffect } from 'react';
 import { setBaseUrl } from '@workspace/api-client-react';
 import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
+import { safeStorage } from '@/lib/safe-storage';
 
 // Aponta o cliente para a URL da API configurada via variável de ambiente.
 // Em produção (Netlify): defina VITE_API_URL no painel do Netlify.
@@ -133,9 +134,9 @@ function AppRouter() {
 function App() {
   useEffect(() => {
     if (skipLoginMode) {
-      localStorage.setItem('elton_garage_skip_login', 'true');
+      safeStorage.setItem('elton_garage_skip_login', 'true');
     } else {
-      localStorage.removeItem('elton_garage_skip_login');
+      safeStorage.removeItem('elton_garage_skip_login');
     }
   }, []);
 

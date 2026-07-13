@@ -51,8 +51,28 @@ app.use(
   }),
 );
 
-app.use(helmet());
-app.use(cors({ origin: corsOrigin, methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], credentials: true }));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        connectSrc: ["'self'", ...(allowedOrigins.length > 0 ? allowedOrigins : ["*"])],
+      },
+    },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+app.use(cors({ 
+  origin: corsOrigin, 
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], 
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400,
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
