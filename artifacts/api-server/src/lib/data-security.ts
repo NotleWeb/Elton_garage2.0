@@ -32,9 +32,9 @@ const COLLECTION_SECURITY: Record<string, CollectionConfig> = {
 export const SECURED_COLLECTIONS = Object.keys(COLLECTION_SECURITY);
 
 function getKeyBuffer(): Buffer {
-  const raw = process.env["DATA_ENCRYPTION_KEY"];
+  const raw = process.env["DATA_ENCRYPTION_KEY"] ?? process.env["SESSION_SECRET"];
   if (!raw) {
-    throw new Error("DATA_ENCRYPTION_KEY environment variable is required for data protection");
+    throw new Error("DATA_ENCRYPTION_KEY or SESSION_SECRET environment variable is required for data protection");
   }
 
   const trimmed = raw.trim();

@@ -91,6 +91,23 @@ router.get("/", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /notifications/:id
+// ---------------------------------------------------------------------------
+
+router.get("/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const n = (await getById("notifications", id)) as any;
+  if (!n) {
+    res.status(404).json({ error: "not_found", message: "Notificacao nao encontrada" });
+    return;
+  }
+
+  const customers = await getAll("customers") as any[];
+  const custMap = new Map(customers.map((c: any) => [c.id, c.name]));
+  res.json(formatNotification(n, custMap));
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /notifications/read-all
 // ---------------------------------------------------------------------------
 
