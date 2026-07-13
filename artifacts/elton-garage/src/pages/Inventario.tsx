@@ -162,12 +162,12 @@ export default function Inventario() {
 
       <Card className="border-border">
         <div className="rounded-md overflow-hidden">
-          <div className="bg-muted/50 grid grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
+          <div className="bg-muted/50 hidden md:grid md:grid-cols-12 gap-4 p-4 text-sm font-medium text-muted-foreground border-b border-border">
             <div className="col-span-2">Data/Hora</div>
             <div className="col-span-4">Produto</div>
             <div className="col-span-2 text-center">Tipo</div>
             <div className="col-span-2 text-right">Quantidade</div>
-            <div className="col-span-2 hidden md:block">Motivo</div>
+            <div className="col-span-2">Motivo</div>
           </div>
           
           <div className="divide-y divide-border">
@@ -177,27 +177,32 @@ export default function Inventario() {
               <div className="p-8 text-center text-muted-foreground">Nenhuma movimentação encontrada.</div>
             ) : (
               data?.data.map((movement) => (
-                <div key={movement.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-secondary/30 transition-colors">
-                  <div className="col-span-2 text-sm text-muted-foreground">
-                    {formatDateTime(movement.createdAt)}
+                <div key={movement.id} className="flex md:grid md:grid-cols-12 gap-4 p-4 flex-col md:items-center hover:bg-secondary/30 transition-colors">
+                  <div className="text-sm text-muted-foreground md:col-span-2 flex justify-between items-center md:block">
+                    <span className="md:hidden font-medium text-foreground">Data/Hora</span>
+                    <span className="truncate">{formatDateTime(movement.createdAt)}</span>
                   </div>
-                  <div className="col-span-4 font-medium text-foreground truncate">
+                  <div className="font-medium text-foreground md:col-span-4">
                     {movement.product?.name || 'Produto Excluído'}
                   </div>
-                  <div className="col-span-2 flex justify-center items-center gap-2">
-                    {getMovementIcon(movement.movementType)}
-                    {getMovementBadge(movement.movementType)}
+                  <div className="flex justify-between items-center md:col-span-2 md:justify-center md:gap-2">
+                    <span className="md:hidden font-medium text-foreground">Tipo</span>
+                    <div className="flex items-center gap-2">
+                      {getMovementIcon(movement.movementType)}
+                      {getMovementBadge(movement.movementType)}
+                    </div>
                   </div>
-                  <div className="col-span-2 text-right font-bold flex items-center justify-end gap-1">
-                    <span className={
+                  <div className="font-bold flex justify-between items-center md:col-span-2 md:justify-end md:gap-1">
+                    <span className="md:hidden font-medium text-foreground">Qtd</span>
+                    <span className={`flex items-center gap-1 ${
                       movement.movementType === 'entrada' ? 'text-emerald-500' :
                       movement.movementType === 'saida' ? 'text-red-500' : 'text-amber-500'
-                    }>
+                    }`}>
                       {movement.movementType === 'saida' ? '-' : '+'}{movement.quantity}
+                      <span className="text-xs text-muted-foreground font-normal">{movement.product?.unit}</span>
                     </span>
-                    <span className="text-xs text-muted-foreground font-normal">{movement.product?.unit}</span>
                   </div>
-                  <div className="col-span-2 hidden md:block text-sm text-muted-foreground truncate">
+                  <div className="hidden md:block md:col-span-2 text-sm text-muted-foreground truncate">
                     {movement.reason || (movement.appointmentId ? `OS #${movement.appointmentId}` : '-')}
                   </div>
                 </div>
