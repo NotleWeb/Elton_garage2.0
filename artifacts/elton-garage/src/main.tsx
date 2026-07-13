@@ -30,4 +30,28 @@ if (!window.localStorage) {
   (window as any).localStorage = createSafeStorage();
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+// Debug: log para verificar o que está acontecendo
+console.log('[MAIN] Document ready');
+console.log('[MAIN] Root element:', document.getElementById('root'));
+console.log('[MAIN] User Agent:', navigator.userAgent);
+
+// Fallback visual se React não montar
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  rootElement.innerHTML = '<div style="padding: 20px; font-family: system-ui; color: #666;">Iniciando aplicação...</div>';
+}
+
+try {
+  const root = createRoot(rootElement!);
+  console.log('[MAIN] React root criado');
+  root.render(<App />);
+  console.log('[MAIN] App renderizado');
+} catch (error) {
+  console.error('[MAIN] Erro ao renderizar:', error);
+  if (rootElement) {
+    rootElement.innerHTML = `<div style="padding: 20px; font-family: system-ui; color: red; white-space: pre-wrap;">
+Erro ao iniciar: ${error instanceof Error ? error.message : String(error)}
+${error instanceof Error ? error.stack : ''}
+    </div>`;
+  }
+}

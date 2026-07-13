@@ -36,6 +36,7 @@ import Notificacoes from '@/pages/Notificacoes';
 import Avaliacoes from '@/pages/Avaliacoes';
 import Usuarios from '@/pages/Usuarios';
 import Configuracoes from '@/pages/Configuracoes';
+import Debug from '@/pages/debug';
 
 // Redirect component — calls navigate inside a component body (hook-safe)
 function Redirect({ to }: { to: string }) {
@@ -52,87 +53,91 @@ function NotificationListener() {
 
 function AppRouter() {
   const { token, isLoading } = useAuth();
+  
+  console.log('[AppRouter] Renderizando, token:', !!token, 'isLoading:', isLoading);
 
-  if (skipLoginMode) {
-    return (
-      <AppLayout>
-        <NotificationListener />
-        <Switch>
-          <Route path="/" ><Redirect to="/dashboard" /></Route>
-          <Route path="/login"><Redirect to="/dashboard" /></Route>
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/agendamentos" component={Agendamentos} />
-          <Route path="/orcamentos" component={Orcamentos} />
-          <Route path="/agendamentos/:id" component={AgendamentoDetail} />
-          <Route path="/clientes" component={Clientes} />
-          <Route path="/clientes/:id" component={ClienteDetail} />
-          <Route path="/veiculos" component={Veiculos} />
-          <Route path="/servicos" component={Servicos} />
-          <Route path="/produtos" component={Produtos} />
-          <Route path="/inventario" component={Inventario} />
-          <Route path="/financeiro" component={Financeiro} />
-          <Route path="/relatorios" component={Relatorios} />
-          <Route path="/fidelidade" component={Fidelidade} />
-          <Route path="/notificacoes" component={Notificacoes} />
-          <Route path="/avaliacoes" component={Avaliacoes} />
-          <Route path="/usuarios" component={Usuarios} />
-          <Route path="/configuracoes" component={Configuracoes} />
-          <Route component={NotFound} />
-        </Switch>
-      </AppLayout>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-primary">
-        Carregando...
-      </div>
-    );
-  }
-
-  // Not authenticated: only allow /login, redirect everything else
-  if (!token) {
-    return (
-      <Switch>
-        <Route path="/login" component={Login} />
-        <Route><Redirect to="/login" /></Route>
-      </Switch>
-    );
-  }
-
-  // Authenticated: full app with layout
+  // Debug route always available - check before auth logic
   return (
-    <AppLayout>
-      <NotificationListener />
+    <>
       <Switch>
-        <Route path="/" ><Redirect to="/dashboard" /></Route>
-        <Route path="/login"><Redirect to="/dashboard" /></Route>
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/agendamentos" component={Agendamentos} />
-        <Route path="/orcamentos" component={Orcamentos} />
-        <Route path="/agendamentos/:id" component={AgendamentoDetail} />
-        <Route path="/clientes" component={Clientes} />
-        <Route path="/clientes/:id" component={ClienteDetail} />
-        <Route path="/veiculos" component={Veiculos} />
-        <Route path="/servicos" component={Servicos} />
-        <Route path="/produtos" component={Produtos} />
-        <Route path="/inventario" component={Inventario} />
-        <Route path="/financeiro" component={Financeiro} />
-        <Route path="/relatorios" component={Relatorios} />
-        <Route path="/fidelidade" component={Fidelidade} />
-        <Route path="/notificacoes" component={Notificacoes} />
-        <Route path="/avaliacoes" component={Avaliacoes} />
-        <Route path="/usuarios" component={Usuarios} />
-        <Route path="/configuracoes" component={Configuracoes} />
-        <Route component={NotFound} />
+        <Route path="/debug" component={Debug} />
       </Switch>
-    </AppLayout>
+      
+      {!location.pathname.startsWith('/debug') && (
+        <>
+          {skipLoginMode ? (
+            <AppLayout>
+              <NotificationListener />
+              <Switch>
+                <Route path="/" ><Redirect to="/dashboard" /></Route>
+                <Route path="/login"><Redirect to="/dashboard" /></Route>
+                <Route path="/dashboard" component={Dashboard} />
+                <Route path="/agendamentos" component={Agendamentos} />
+                <Route path="/orcamentos" component={Orcamentos} />
+                <Route path="/agendamentos/:id" component={AgendamentoDetail} />
+                <Route path="/clientes" component={Clientes} />
+                <Route path="/clientes/:id" component={ClienteDetail} />
+                <Route path="/veiculos" component={Veiculos} />
+                <Route path="/servicos" component={Servicos} />
+                <Route path="/produtos" component={Produtos} />
+                <Route path="/inventario" component={Inventario} />
+                <Route path="/financeiro" component={Financeiro} />
+                <Route path="/relatorios" component={Relatorios} />
+                <Route path="/fidelidade" component={Fidelidade} />
+                <Route path="/notificacoes" component={Notificacoes} />
+                <Route path="/avaliacoes" component={Avaliacoes} />
+                <Route path="/usuarios" component={Usuarios} />
+                <Route path="/configuracoes" component={Configuracoes} />
+                <Route component={NotFound} />
+              </Switch>
+            </AppLayout>
+          ) : isLoading ? (
+            <div className="min-h-screen bg-background flex items-center justify-center text-primary">
+              Carregando...
+            </div>
+          ) : !token ? (
+            <Switch>
+              <Route path="/login" component={Login} />
+              <Route><Redirect to="/login" /></Route>
+            </Switch>
+          ) : (
+            <AppLayout>
+              <NotificationListener />
+              <Switch>
+                <Route path="/" ><Redirect to="/dashboard" /></Route>
+                <Route path="/login"><Redirect to="/dashboard" /></Route>
+                <Route path="/dashboard" component={Dashboard} />
+                <Route path="/agendamentos" component={Agendamentos} />
+                <Route path="/orcamentos" component={Orcamentos} />
+                <Route path="/agendamentos/:id" component={AgendamentoDetail} />
+                <Route path="/clientes" component={Clientes} />
+                <Route path="/clientes/:id" component={ClienteDetail} />
+                <Route path="/veiculos" component={Veiculos} />
+                <Route path="/servicos" component={Servicos} />
+                <Route path="/produtos" component={Produtos} />
+                <Route path="/inventario" component={Inventario} />
+                <Route path="/financeiro" component={Financeiro} />
+                <Route path="/relatorios" component={Relatorios} />
+                <Route path="/fidelidade" component={Fidelidade} />
+                <Route path="/notificacoes" component={Notificacoes} />
+                <Route path="/avaliacoes" component={Avaliacoes} />
+                <Route path="/usuarios" component={Usuarios} />
+                <Route path="/configuracoes" component={Configuracoes} />
+                <Route component={NotFound} />
+              </Switch>
+            </AppLayout>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
 function App() {
+  console.log('[APP] Renderizando App, skipLoginMode:', skipLoginMode);
+  
   useEffect(() => {
+    console.log('[APP] Inicializando localStorage skip_login');
     if (skipLoginMode) {
       safeStorage.setItem('elton_garage_skip_login', 'true');
     } else {
@@ -143,6 +148,8 @@ function App() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } }
   });
+
+  console.log('[APP] Renderizando QueryClientProvider');
 
   return (
     <QueryClientProvider client={queryClient}>
