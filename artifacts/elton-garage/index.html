@@ -21,9 +21,57 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        color: #fff;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #root {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      .fallback {
+        padding: 20px;
+        text-align: center;
+        background: #1a1a1a;
+        border-radius: 8px;
+        max-width: 90%;
+        margin: 20px;
+      }
+      .fallback h1 {
+        margin: 0 0 10px 0;
+        font-size: 24px;
+      }
+      .fallback p {
+        margin: 5px 0;
+        font-size: 14px;
+        color: #aaa;
+      }
+      .fallback a {
+        color: #0f0;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 15px;
+        padding: 10px 20px;
+        border: 1px solid #0f0;
+        border-radius: 4px;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="fallback">
+        <h1>⏳ Carregando...</h1>
+        <p>Elton Garage está iniciando</p>
+        <p style="font-size: 12px; margin-top: 15px;">Se a página ficar branca, tente:</p>
+        <p style="font-size: 12px;"><a href="/debug">Abrir Debug →</a></p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
