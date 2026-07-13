@@ -59,10 +59,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div className="page-shell">
+      <div className="page-header gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="page-title">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
             Uma visão centralizada dos principais indicadores e insights do seu negócio.
           </p>
@@ -72,7 +72,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
+      <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-4">
         <Card className="h-full border-border shadow-sm">
           <CardHeader className="flex items-center justify-between border-b border-border pb-3">
             <CardTitle className="text-sm font-semibold">Receita do Mês</CardTitle>
@@ -122,7 +122,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-7">
+      <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-7">
         <Card className="col-span-1 lg:col-span-4 border-border shadow-sm">
           <CardHeader>
             <CardTitle>Receita por Dia</CardTitle>
@@ -182,7 +182,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-2">
         <Card className="border-border shadow-sm min-h-[260px]">
           <CardHeader>
             <CardTitle>Próximos Agendamentos</CardTitle>

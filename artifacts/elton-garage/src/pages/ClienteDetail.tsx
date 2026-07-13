@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { 
   useGetCustomer, 
   useUpdateCustomer, 
   getGetCustomerQueryKey,
+  getListCustomersQueryKey,
   useListCustomerAppointments,
   useCreateVehicle,
   getListCustomerVehiclesQueryKey,
@@ -39,6 +40,17 @@ const vehicleSchema = z.object({
 
 type VehicleForm = z.infer<typeof vehicleSchema>;
 
+const customerSchema = z.object({
+  name: z.string().min(2, 'Nome obrigatório'),
+  phone: z.string().optional(),
+  whatsapp: z.string().optional(),
+  email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+  address: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type CustomerForm = z.infer<typeof customerSchema>;
+
 export default function ClienteDetail({ params }: { params: { id: string } }) {
   const id = parseInt(params.id);
   const [, setLocation] = useLocation();
@@ -46,14 +58,23 @@ export default function ClienteDetail({ params }: { params: { id: string } }) {
   const { toast } = useToast();
   
   const [isVehicleOpen, setIsVehicleOpen] = useState(false);
+  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: customer, isLoading } = useGetCustomer(id, { query: { enabled: !!id } as any });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: appointmentsResponse } = useListCustomerAppointments(id, { query: { enabled: !!id } as any });
   
+  const updateCustomerMutation = useUpdateCustomer();
   const createVehicleMutation = useCreateVehicle();
   const redeemWashMutation = useRedeemFreeWash();
+
+  const customerForm = useForm<CustomerForm>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: '', phone: '', whatsapp: '', email: '', address: '', notes: ''
+    }
+  });
 
   const vehicleForm = useForm<VehicleForm>({
     resolver: zodResolver(vehicleSchema),
@@ -61,6 +82,32 @@ export default function ClienteDetail({ params }: { params: { id: string } }) {
       brand: '', model: '', plate: '', color: '', fuel: undefined, notes: ''
     }
   });
+
+  useEffect(() => {
+    if (!customer) return;
+    customerForm.reset({
+      name: customer.name ?? '',
+      phone: customer.phone ?? '',
+      whatsapp: customer.whatsapp ?? '',
+      email: customer.email ?? '',
+      address: customer.address ?? '',
+      notes: customer.notes ?? '',
+    });
+  }, [customer, customerForm]);
+
+  const onCustomerSubmit = (values: CustomerForm) => {
+    updateCustomerMutation.mutate({ id, data: values }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetCustomerQueryKey(id) });
+        queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+        toast({ title: 'Cliente atualizado com sucesso!' });
+        setIsEditCustomerOpen(false);
+      },
+      onError: () => {
+        toast({ title: 'Erro ao atualizar cliente', variant: 'destructive' });
+      }
+    });
+  };
 
   const onVehicleSubmit = (values: VehicleForm) => {
     createVehicleMutation.mutate({ data: { ...values, customerId: id } }, {
@@ -97,12 +144,12 @@ export default function ClienteDetail({ params }: { params: { id: string } }) {
   const stamps = loyalty?.currentStampCount || 0;
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="page-shell">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" onClick={() => setLocation('/clientes')}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <h1 className="text-3xl font-bold tracking-tight">Perfil do Cliente</h1>
+        <h1 className="page-title">Perfil do Cliente</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -122,7 +169,47 @@ export default function ClienteDetail({ params }: { params: { id: string } }) {
                     <CardDescription>Cliente desde {formatDate(customer.createdAt)}</CardDescription>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon"><Edit className="w-4 h-4" /></Button>
+                <Dialog open={isEditCustomerOpen} onOpenChange={setIsEditCustomerOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon"><Edit className="w-4 h-4" /></Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Editar Cliente</DialogTitle>
+                    </DialogHeader>
+                    <Form {...customerForm}>
+                      <form onSubmit={customerForm.handleSubmit(onCustomerSubmit)} className="space-y-4 pt-4">
+                        <FormField control={customerForm.control} name="name" render={({ field }) => (
+                          <FormItem><FormLabel>Nome Completo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField control={customerForm.control} name="phone" render={({ field }) => (
+                            <FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                          <FormField control={customerForm.control} name="whatsapp" render={({ field }) => (
+                            <FormItem><FormLabel>WhatsApp</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        </div>
+                        <FormField control={customerForm.control} name="email" render={({ field }) => (
+                          <FormItem><FormLabel>E-mail</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={customerForm.control} name="address" render={({ field }) => (
+                          <FormItem><FormLabel>Endereço</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={customerForm.control} name="notes" render={({ field }) => (
+                          <FormItem><FormLabel>Observações</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <div className="flex justify-end gap-2 pt-4">
+                          <Button type="button" variant="outline" onClick={() => setIsEditCustomerOpen(false)}>Cancelar</Button>
+                          <Button type="submit" disabled={updateCustomerMutation.isPending}>
+                            {updateCustomerMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Salvar Alterações
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">

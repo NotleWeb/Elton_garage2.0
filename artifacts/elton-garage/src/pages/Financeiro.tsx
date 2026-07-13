@@ -129,9 +129,9 @@ export default function Financeiro() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Financeiro</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <h1 className="page-title">Financeiro</h1>
         <Dialog open={isCreateOpen} onOpenChange={(open) => { 
           setIsCreateOpen(open); 
           if (!open) { 

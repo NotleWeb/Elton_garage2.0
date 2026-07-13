@@ -367,8 +367,11 @@ export async function customFetch<T = unknown>(
 
   if (response.status === 401) {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('elton_garage_token');
-      window.location.href = '/login';
+      const skipLogin = localStorage.getItem('elton_garage_skip_login') === 'true';
+      if (!skipLogin) {
+        localStorage.removeItem('elton_garage_token');
+        window.location.href = '/login';
+      }
     }
   }
 

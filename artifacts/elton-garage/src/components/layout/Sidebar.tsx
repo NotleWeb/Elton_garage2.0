@@ -63,7 +63,12 @@ export function Sidebar() {
 
   return (
     <UISidebar className="border-r border-border bg-card">
-      <div className="h-16 flex items-center px-4 border-b border-border">
+      <div className="h-16 flex items-center px-4 border-b border-border gap-3">
+        <img
+          src="/logo-elton-garage.jpeg"
+          alt="Elton Garage"
+          className="h-9 w-9 rounded-md object-cover border border-border"
+        />
         <h1 className="text-xl font-bold text-primary tracking-tight">Elton Garage</h1>
       </div>
       <div className="flex-1 overflow-y-auto py-6 space-y-6">

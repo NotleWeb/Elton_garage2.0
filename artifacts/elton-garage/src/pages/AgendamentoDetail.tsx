@@ -126,13 +126,13 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
   const totalDuration = (appointment as any).totalDuration || aptServices.reduce((s: number, sv: any) => s + (sv.estimatedDuration || 0), 0);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+    <div className="page-shell pb-12">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" onClick={() => setLocation('/agendamentos')}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">O.S. #{appointment.id}</h1>
+          <h1 className="page-title">O.S. #{appointment.id}</h1>
           <p className="text-muted-foreground">{formatDateTime(appointment.appointmentDate)}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">

@@ -83,10 +83,10 @@ export default function Usuarios() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="page-shell">
+      <div className="page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Controle de Usuários</h1>
+          <h1 className="page-title">Controle de Usuários</h1>
           <p className="text-muted-foreground">Gerencie quem tem acesso ao sistema</p>
         </div>
         

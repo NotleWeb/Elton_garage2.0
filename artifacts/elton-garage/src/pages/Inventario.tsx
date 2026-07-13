@@ -86,11 +86,11 @@ export default function Inventario() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Inventário</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <h1 className="page-title">Inventário</h1>
         
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="page-actions gap-3">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filtrar por tipo" />

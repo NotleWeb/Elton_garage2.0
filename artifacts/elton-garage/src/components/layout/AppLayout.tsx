@@ -25,12 +25,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen overflow-hidden overflow-x-hidden bg-background">
+      <div className="flex w-full min-h-screen overflow-hidden overflow-x-hidden bg-background">
         <Sidebar />
-        <div className="flex min-h-screen flex-1 min-w-0 flex-col overflow-hidden">
+        <div className="flex w-full min-h-screen flex-1 min-w-0 flex-col overflow-hidden">
           <Header />
-          <main className={`flex-1 overflow-y-auto ${isMobile ? 'py-3' : 'py-8'}`}>
-            <div className={`mx-auto w-full ${isMobile ? 'max-w-6xl px-3' : 'max-w-7xl px-4 sm:px-6 lg:px-8'}`}>
+          <main className={`flex-1 overflow-y-auto ${isMobile ? 'py-4' : 'py-6 lg:py-8'}`}>
+            <div className={`w-full min-w-0 ${isMobile ? 'px-3' : 'px-4 sm:px-6 lg:px-8 xl:px-10'}`}>
               {children}
             </div>
           </main>

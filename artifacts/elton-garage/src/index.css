@@ -44,27 +44,27 @@
 
 :root, .dark {
   color-scheme: dark;
-  --background: 240 10% 4%;
+  --background: 0 0% 4%;
   --foreground: 0 0% 98%;
-  --card: 240 10% 6%;
+  --card: 0 0% 7%;
   --card-foreground: 0 0% 98%;
-  --card-border: 240 10% 12%;
-  --popover: 240 10% 6%;
+  --card-border: 270 20% 19%;
+  --popover: 0 0% 7%;
   --popover-foreground: 0 0% 98%;
-  --popover-border: 240 10% 12%;
-  --primary: 199 89% 48%; 
+  --popover-border: 270 20% 19%;
+  --primary: 271 88% 57%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 240 10% 12%;
+  --secondary: 0 0% 12%;
   --secondary-foreground: 0 0% 98%;
-  --muted: 240 10% 12%;
-  --muted-foreground: 240 5% 65%;
-  --accent: 240 10% 12%;
-  --accent-foreground: 0 0% 98%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 72%;
+  --accent: 45 96% 52%;
+  --accent-foreground: 0 0% 8%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
-  --border: 240 10% 15%;
-  --input: 240 10% 15%;
-  --ring: 199 89% 48%;
+  --border: 270 24% 22%;
+  --input: 0 0% 15%;
+  --ring: 271 88% 57%;
   
   --radius: 0.5rem;
 }
@@ -86,6 +86,22 @@
 /* App-wide design tokens and components for consistent layout */
 @layer components {
   /* Spacing scale (8,12,16,24,32,48) available via utilities but defined here for reference */
+
+  .page-shell {
+    @apply w-full max-w-none space-y-6;
+  }
+
+  .page-header {
+    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .page-title {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+  }
+
+  .page-actions {
+    @apply flex flex-wrap items-center gap-2 w-full sm:w-auto;
+  }
 
   .app-container {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;

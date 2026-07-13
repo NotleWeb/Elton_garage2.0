@@ -61,10 +61,10 @@ export default function Avaliacoes() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="page-shell">
+      <div className="page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Avaliações de Clientes</h1>
+          <h1 className="page-title">Avaliações de Clientes</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-muted-foreground text-sm">Média Geral:</span>
             <div className="flex items-center">

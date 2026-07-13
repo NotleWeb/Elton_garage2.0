@@ -46,7 +46,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <img
-            src="/logo-elton-garage.png"
+            src="/logo-elton-garage.jpeg"
             alt="Elton Garage"
             className="w-44 h-auto drop-shadow-xl"
           />

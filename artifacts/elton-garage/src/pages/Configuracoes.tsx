@@ -61,9 +61,9 @@ export default function Configuracoes() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="page-shell">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Configurações do Sistema</h1>
+        <h1 className="page-title">Configurações do Sistema</h1>
         <p className="text-muted-foreground">Gerenciamento de dados e segurança</p>
       </div>
 
