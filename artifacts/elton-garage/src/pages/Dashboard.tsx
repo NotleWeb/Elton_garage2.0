@@ -5,7 +5,6 @@ import {
   useGetUpcomingAppointments,
   useGetCustomersNeedingService
 } from '@workspace/api-client-react';
-import { useUpcomingAppointmentNotifications } from '@/hooks/use-upcoming-appointment-notifications';
 import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
@@ -28,9 +27,6 @@ export default function Dashboard() {
   const { data: topServices } = useGetTopServices({ month: currentMonth, year: currentYear, limit: 5 });
   const { data: upcoming } = useGetUpcomingAppointments({ limit: 5 });
   const { data: needingService } = useGetCustomersNeedingService({ days: 90, limit: 5 });
-
-  // Ativar notificações de agendamentos próximos
-  useUpcomingAppointmentNotifications();
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
