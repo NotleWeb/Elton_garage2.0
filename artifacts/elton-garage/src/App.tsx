@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useEffect } from 'react';
 import { setBaseUrl } from '@workspace/api-client-react';
-import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
 import { safeStorage } from '@/lib/safe-storage';
 
 // Aponta o cliente para a URL da API configurada via variável de ambiente.
@@ -45,12 +44,6 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
-// Component wrapper que ativa notificações do navegador para usuários autenticados
-function NotificationListener() {
-  useBrowserNotifications();
-  return null;
-}
-
 function AppRouter() {
   const { token, isLoading } = useAuth();
   
@@ -67,7 +60,6 @@ function AppRouter() {
         <>
           {skipLoginMode ? (
             <AppLayout>
-              <NotificationListener />
               <Switch>
                 <Route path="/" ><Redirect to="/dashboard" /></Route>
                 <Route path="/login"><Redirect to="/dashboard" /></Route>
@@ -102,7 +94,6 @@ function AppRouter() {
             </Switch>
           ) : (
             <AppLayout>
-              <NotificationListener />
               <Switch>
                 <Route path="/" ><Redirect to="/dashboard" /></Route>
                 <Route path="/login"><Redirect to="/dashboard" /></Route>
