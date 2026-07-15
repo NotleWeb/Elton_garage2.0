@@ -140,6 +140,7 @@ export default function Agendamentos() {
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
@@ -158,6 +159,7 @@ export default function Agendamentos() {
   const { data: services } = useListServices({ limit: 100, active: true });
   const { data: vehiclesResponse } = useListCustomerVehicles(selectedCustomerId || 0, { query: { enabled: !!selectedCustomerId } as any });
   const vehicles = (vehiclesResponse as any[]) || [];
+  const customerOptions = [...(customers?.data || [])].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const createMutation = useCreateAppointment();
   const createCustomerMutation = useCreateCustomer();
@@ -285,7 +287,11 @@ export default function Agendamentos() {
 
           <Dialog open={isCreateOpen} onOpenChange={(open) => {
             setIsCreateOpen(open);
-            if (!open) { form.reset(); setSelectedCustomerId(undefined); }
+            if (!open) {
+              form.reset();
+              setSelectedCustomerId(undefined);
+              setCustomerPickerOpen(false);
+            }
           }}>
             <DialogTrigger asChild>
               <Button className="shrink-0"><Plus className="w-4 h-4 mr-2" /> Novo Agendamento</Button>
@@ -301,16 +307,51 @@ export default function Agendamentos() {
                   <FormField control={form.control} name="customerId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Cliente</FormLabel>
-                      <Select onValueChange={(v) => {
-                        field.onChange(parseInt(v));
-                        setSelectedCustomerId(parseInt(v));
-                        form.setValue('vehicleId', 0);
-                      }} value={field.value ? String(field.value) : undefined}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione um cliente" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {customers?.data.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={customerPickerOpen} onOpenChange={setCustomerPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between font-normal"
+                            >
+                              {field.value
+                                ? (customerOptions.find((c) => c.id === field.value)?.name || 'Selecione um cliente')
+                                : 'Selecione um cliente'}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Buscar cliente..." />
+                            <CommandList className="max-h-64 overflow-y-auto">
+                              <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                              <CommandGroup heading="Clientes">
+                                {customerOptions.map((c) => {
+                                  const selected = field.value === c.id;
+                                  return (
+                                    <CommandItem
+                                      key={c.id}
+                                      value={`${c.name} ${c.phone || ''} ${c.whatsapp || ''}`}
+                                      onSelect={() => {
+                                        field.onChange(c.id);
+                                        setSelectedCustomerId(c.id);
+                                        form.setValue('vehicleId', 0);
+                                        setCustomerPickerOpen(false);
+                                      }}
+                                    >
+                                      <Check className={cn('mr-2 h-4 w-4', selected ? 'opacity-100 text-primary' : 'opacity-0')} />
+                                      <span className="truncate">{c.name}</span>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                       <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setIsNewCustomerOpen((open) => !open)}>
                         {isNewCustomerOpen ? 'Fechar novo cliente' : 'Cadastrar novo cliente'}
