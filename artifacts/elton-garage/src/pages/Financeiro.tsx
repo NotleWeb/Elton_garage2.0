@@ -47,12 +47,18 @@ export default function Financeiro() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const monthStart = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`;
+  const monthLastDay = new Date(year, month, 0).getDate();
+  const monthEnd = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(monthLastDay).padStart(2, '0')}`;
+
   const { data: summary, isLoading: summaryLoading } = useGetFinancialSummary({ month, year });
   
   const { data: transactions, isLoading: txLoading } = useListTransactions({ 
     page, 
     limit: 20,
-    type: typeFilter !== 'todos' ? (typeFilter as any) : undefined
+    type: typeFilter !== 'todos' ? (typeFilter as any) : undefined,
+    dateFrom: monthStart,
+    dateTo: monthEnd,
   });
 
   const createMutation = useCreateTransaction();

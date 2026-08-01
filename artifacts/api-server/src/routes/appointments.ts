@@ -181,13 +181,37 @@ async function loadAppointmentDetail(apt: any) {
 // ── GET /appointments ─────────────────────────────────────────────────────────
 
 router.get("/", async (req, res) => {
-  const { page = "1", limit = "20", status, customerId, vehicleId, startDate, endDate } = req.query as any;
+  const {
+    page = "1",
+    limit = "20",
+    status,
+    customerId,
+    vehicleId,
+    startDate,
+    endDate,
+    dateFrom,
+    dateTo,
+    month,
+    year,
+  } = req.query as any;
   let apts = await getAll("appointments") as any[];
+  const start = dateFrom ?? startDate;
+  const end = dateTo ?? endDate;
+  const monthNum = Number(month);
+  const yearNum = Number(year);
+
   if (status) apts = apts.filter((a) => a.status === status);
   if (customerId) apts = apts.filter((a) => a.customer_id === Number(customerId));
   if (vehicleId) apts = apts.filter((a) => a.vehicle_id === Number(vehicleId));
-  if (startDate) apts = apts.filter((a) => (a.appointment_date ?? "") >= startDate);
-  if (endDate) apts = apts.filter((a) => (a.appointment_date ?? "") <= endDate + "T23:59:59");
+
+  if (Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12 && Number.isFinite(yearNum) && yearNum > 0) {
+    const ym = `${String(yearNum).padStart(4, "0")}-${String(monthNum).padStart(2, "0")}`;
+    apts = apts.filter((a) => (a.appointment_date ?? "").startsWith(ym));
+  } else {
+    if (start) apts = apts.filter((a) => (a.appointment_date ?? "") >= start);
+    if (end) apts = apts.filter((a) => (a.appointment_date ?? "") <= end + "T23:59:59");
+  }
+
   apts.sort((a, b) => (b.appointment_date ?? "").localeCompare(a.appointment_date ?? ""));
   const total = apts.length;
   const pg = Number(page);

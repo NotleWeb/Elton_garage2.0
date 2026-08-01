@@ -42,7 +42,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen w-screen bg-[radial-gradient(ellipse_at_top,_hsl(var(--secondary))_0%,_hsl(var(--background))_55%)] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <img

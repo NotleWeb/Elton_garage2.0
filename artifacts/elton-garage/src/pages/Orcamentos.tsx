@@ -90,6 +90,7 @@ async function imageUrlToDataUrl(url: string): Promise<string | null> {
 export default function Orcamentos() {
   const { toast } = useToast();
   const [customerId, setCustomerId] = useState<number | null>(null);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [vehicleId, setVehicleId] = useState<number | null>(null);
   const [serviceIds, setServiceIds] = useState<number[]>([]);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
@@ -280,14 +281,45 @@ export default function Orcamentos() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cliente</Label>
-                <Select value={customerId ? String(customerId) : undefined} onValueChange={(v) => resetVehicleWhenCustomerChanges(Number(v))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={String(customer.id)}>{customer.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={customerPickerOpen} onOpenChange={setCustomerPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
+                    >
+                      {selectedCustomer?.name || 'Selecione o cliente'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command shouldFilter>
+                      <CommandInput placeholder="Buscar cliente por nome..." />
+                      <CommandList className="max-h-64 overflow-y-auto">
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup heading="Clientes">
+                          {customers.map((customer) => {
+                            const selected = customer.id === customerId;
+                            return (
+                              <CommandItem
+                                key={customer.id}
+                                value={`${customer.name} ${customer.phone || ''} ${customer.whatsapp || ''}`}
+                                onSelect={() => {
+                                  resetVehicleWhenCustomerChanges(customer.id);
+                                  setCustomerPickerOpen(false);
+                                }}
+                              >
+                                <Check className={cn('mr-2 h-4 w-4', selected ? 'opacity-100 text-primary' : 'opacity-0')} />
+                                <span className="truncate">{customer.name}</span>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">

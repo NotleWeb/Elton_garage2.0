@@ -64,15 +64,34 @@ router.get("/summary", async (req, res) => {
 
 // GET /financial
 router.get("/", async (req, res) => {
-  const { page = "1", limit = "20", type, search = "", startDate, endDate, dateFrom, dateTo, category } = req.query as any;
+  const {
+    page = "1",
+    limit = "20",
+    type,
+    search = "",
+    startDate,
+    endDate,
+    dateFrom,
+    dateTo,
+    category,
+    month,
+    year,
+  } = req.query as any;
   const all = await getAll("financial_transactions") as any[];
   const q = (search as string).toLowerCase();
   const start = dateFrom ?? startDate;
   const end = dateTo ?? endDate;
+  const monthNum = Number(month);
+  const yearNum = Number(year);
+  const ym = Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12 && Number.isFinite(yearNum) && yearNum > 0
+    ? `${String(yearNum).padStart(4, "0")}-${String(monthNum).padStart(2, "0")}`
+    : null;
+
   let filtered = all.filter((t: any) => {
     if (type && t.type !== type) return false;
     if (category && t.category !== category) return false;
     if (q && !t.description?.toLowerCase().includes(q) && !t.category?.toLowerCase().includes(q)) return false;
+    if (ym && !(t.date ?? "").startsWith(ym)) return false;
     if (start && t.date < start) return false;
     if (end && t.date > end) return false;
     return true;

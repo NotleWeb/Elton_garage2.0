@@ -134,10 +134,13 @@ function cleanVehicleText(value?: string | null): string {
 }
 
 export default function Agendamentos() {
+  const currentDate = new Date();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('todos');
+  const [month, setMonth] = useState(currentDate.getMonth() + 1);
+  const [year, setYear] = useState(currentDate.getFullYear());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
@@ -148,11 +151,19 @@ export default function Agendamentos() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const monthStart = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`;
+  const monthLastDay = new Date(year, month, 0).getDate();
+  const monthEnd = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(monthLastDay).padStart(2, '0')}`;
+  const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+    .format(new Date(year, month - 1, 1));
+
   const { data, isLoading } = useListAppointments({
     page,
     limit: 20,
     search: debouncedSearch || undefined,
-    status: statusFilter !== 'todos' ? (statusFilter as any) : undefined
+    status: statusFilter !== 'todos' ? (statusFilter as any) : undefined,
+    dateFrom: monthStart,
+    dateTo: monthEnd,
   });
 
   const { data: customers } = useListCustomers({ limit: 100 });
@@ -261,6 +272,32 @@ export default function Agendamentos() {
         <h1 className="page-title">Agendamentos</h1>
 
         <div className="page-actions gap-3">
+          <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+            <span className="text-sm font-medium capitalize">{monthLabel}</span>
+            <Select value={String(month)} onValueChange={(v) => { setMonth(parseInt(v)); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)} className="capitalize">
+                    {new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(2020, i, 1))}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={(v) => { setYear(parseInt(v)); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[100px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[year - 2, year - 1, year, year + 1, year + 2].map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Filtrar status" />
