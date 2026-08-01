@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db, getById } from "../db.js";
-import { getLookupHash } from "../lib/data-security.js";
+import { getLookupHash, secureDataForRead } from "../lib/data-security.js";
 
 const router = Router();
 
@@ -45,13 +45,18 @@ router.post("/login", async (req, res) => {
   }
 
   const doc = snap.docs[0];
-  const user = await getById("users", Number(doc.id)) as any;
-  if (!user) {
+  const user = {
+    id: Number(doc.id),
+    ...secureDataForRead("users", doc.data() as Record<string, unknown>),
+  } as any;
+
+  if (!user || !user.password_hash) {
     res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
     return;
   }
 
-  if (!bcrypt.compareSync(password, user.password_hash)) {
+  const passwordMatches = await bcrypt.compare(password, String(user.password_hash));
+  if (!passwordMatches) {
     res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
     return;
   }

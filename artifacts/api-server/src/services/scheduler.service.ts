@@ -2,31 +2,9 @@ import { db, getAll, getById } from "../db.js";
 import { scheduleFollowUpReminders, scheduleAppointmentReminder } from "./notification.service.js";
 import { logger } from "../lib/logger.js";
 
-type FollowUpSubtype = "feedback_1d" | "maintenance_15d" | "return_30d";
-
 // ---------------------------------------------------------------------------
-// Build a Set of customer IDs that already have an unread pending follow-up
-// for a given subtype — used to skip backfilling where not needed.
-// ---------------------------------------------------------------------------
-
-async function customerIdsWithPendingFollowUp(subtype: FollowUpSubtype): Promise<Set<number>> {
-  const snap = await db
-    .collection("notifications")
-    .where("subtype", "==", subtype)
-    .where("read", "==", 0)
-    .get();
-  const ids = new Set<number>();
-  snap.docs.forEach((d) => {
-    const cid = (d.data() as any).customer_id;
-    if (cid != null) ids.add(Number(cid));
-  });
-  return ids;
-}
-
-// ---------------------------------------------------------------------------
-// Follow-up generator — for each completed appointment, ensure all 3 follow-up
-// subtypes exist at the customer level. Uses per-subtype query to avoid
-// unnecessary creates.
+// Follow-up generator — for each completed appointment, ensure follow-ups
+// exist. scheduleFollowUpReminders is idempotent per appointment+subtype.
 // ---------------------------------------------------------------------------
 
 async function generateMissingFollowUps(): Promise<void> {
@@ -34,43 +12,24 @@ async function generateMissingFollowUps(): Promise<void> {
   const completed = appointments.filter((a) => a.status === "concluido");
   if (completed.length === 0) return;
 
-  // Gather which customers already have each subtype (single query per subtype)
-  const [hasFeedback, hasMaintenance, hasReturn] = await Promise.all([
-    customerIdsWithPendingFollowUp("feedback_1d"),
-    customerIdsWithPendingFollowUp("maintenance_15d"),
-    customerIdsWithPendingFollowUp("return_30d"),
-  ]);
+  const customers = (await getAll("customers")) as any[];
+  const customerNameById = new Map<number, string>(
+    customers.map((c: any) => [Number(c.id), String(c.name ?? "")]),
+  );
 
-  // Group completed appointments by customer, keep only the latest per customer
-  const latestByCustomer = new Map<number, any>();
   for (const apt of completed) {
-    const cid = apt.customer_id as number;
-    const existing = latestByCustomer.get(cid);
-    const aptDate = apt.updated_at ?? apt.appointment_date ?? apt.created_at ?? "";
-    const existingDate = existing
-      ? (existing.updated_at ?? existing.appointment_date ?? existing.created_at ?? "")
-      : "";
-    if (!existing || aptDate > existingDate) {
-      latestByCustomer.set(cid, apt);
-    }
-  }
-
-  for (const [customerId, apt] of latestByCustomer) {
-    const needsFeedback = !hasFeedback.has(customerId);
-    const needsMaintenance = !hasMaintenance.has(customerId);
-    const needsReturn = !hasReturn.has(customerId);
-
-    if (!needsFeedback && !needsMaintenance && !needsReturn) continue;
-
-    const customer = (await getById("customers", customerId)) as any;
-    if (!customer) continue;
+    const customerId = Number(apt.customer_id);
+    if (!Number.isFinite(customerId)) continue;
+    const customerName = customerNameById.get(customerId);
+    if (!customerName) continue;
 
     const completionDate = apt.updated_at ?? apt.appointment_date ?? apt.created_at;
+    if (!completionDate) continue;
 
     await scheduleFollowUpReminders({
-      appointmentId: apt.id,
+      appointmentId: Number(apt.id),
       customerId,
-      customerName: customer.name,
+      customerName,
       completionDate,
     });
   }
@@ -125,6 +84,53 @@ async function generateMissingAppointmentReminders(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Reconcile existing appointment reminder messages so previously generated
+// records also reflect the latest formatting rules (including timezone).
+// ---------------------------------------------------------------------------
+
+async function reconcileAppointmentReminderMessages(): Promise<void> {
+  const notifications = (await getAll("notifications")) as any[];
+  const appointments = (await getAll("appointments")) as any[];
+  const reminderAppointmentIds = Array.from(new Set(
+    notifications
+      .filter((n) => n.subtype === "appointment_reminder" && n.appointment_id != null)
+      .map((n) => Number(n.appointment_id))
+      .filter((id) => Number.isFinite(id)),
+  ));
+
+  for (const appointmentId of reminderAppointmentIds) {
+    const apt = appointments.find((a) => Number(a.id) === appointmentId);
+    if (!apt) continue;
+
+    const [customer, vehicle] = await Promise.all([
+      getById("customers", Number(apt.customer_id)),
+      getById("vehicles", Number(apt.vehicle_id)),
+    ]) as [any, any];
+
+    if (!customer) continue;
+
+    const aptSvcSnap = await db
+      .collection("appointment_services")
+      .where("appointment_id", "==", appointmentId)
+      .get();
+
+    const svcIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
+    const services = await Promise.all(svcIds.map((sid) => getById("services", sid))) as any[];
+    const validServices = services.filter(Boolean);
+
+    await scheduleAppointmentReminder({
+      appointmentId,
+      appointmentDate: apt.appointment_date,
+      customerId: Number(apt.customer_id),
+      customerName: customer.name,
+      vehicleInfo: vehicle ? `${vehicle.brand} ${vehicle.model}` : "",
+      plate: vehicle?.plate ?? "",
+      serviceNames: validServices.map((s: any) => s.name),
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Scheduler bootstrap — runs once on startup then every hour
 // ---------------------------------------------------------------------------
 
@@ -132,6 +138,7 @@ async function runJobs(): Promise<void> {
   await Promise.allSettled([
     generateMissingFollowUps(),
     generateMissingAppointmentReminders(),
+    reconcileAppointmentReminderMessages(),
   ]);
 }
 

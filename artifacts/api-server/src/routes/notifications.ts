@@ -52,6 +52,8 @@ router.get("/", async (req, res) => {
   let filtered = (notifications as any[]).filter((n) => {
     // Exclude archived
     if (n.archived) return false;
+    // Exclude completed ("Mark as Completed" means dismiss permanently)
+    if (n.completed) return false;
     // Only return due notifications (scheduled_for <= now or no schedule)
     if (n.scheduled_for && new Date(n.scheduled_for) > now) return false;
     return true;
@@ -78,7 +80,7 @@ router.get("/", async (req, res) => {
   const total = filtered.length;
   // Unread count across ALL due, non-archived notifications (ignoring page/type filters)
   const unreadCount = (notifications as any[]).filter(
-    (n) => !n.read && !n.archived && isDue(n),
+    (n) => !n.read && !n.archived && !n.completed && isDue(n),
   ).length;
 
   const pg = Number(page);
@@ -113,7 +115,7 @@ router.get("/:id", async (req, res) => {
 
 router.patch("/read-all", async (_req, res) => {
   const all = (await getAll("notifications")) as any[];
-  const due = all.filter((n) => !n.read && !n.archived && isDue(n));
+  const due = all.filter((n) => !n.read && !n.archived && !n.completed && isDue(n));
   await Promise.all(
     due.map((n) => updateDocById("notifications", n.id, { read: 1, read_at: nowIso() })),
   );

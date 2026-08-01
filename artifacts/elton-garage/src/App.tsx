@@ -37,6 +37,10 @@ import Usuarios from '@/pages/Usuarios';
 import Configuracoes from '@/pages/Configuracoes';
 import Debug from '@/pages/debug';
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+});
+
 // Redirect component — calls navigate inside a component body (hook-safe)
 function Redirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
@@ -46,8 +50,6 @@ function Redirect({ to }: { to: string }) {
 
 function AppRouter() {
   const { token, isLoading } = useAuth();
-  
-  console.log('[AppRouter] Renderizando, token:', !!token, 'isLoading:', isLoading);
 
   // Debug route always available - check before auth logic
   return (
@@ -125,22 +127,13 @@ function AppRouter() {
 }
 
 function App() {
-  console.log('[APP] Renderizando App, skipLoginMode:', skipLoginMode);
-  
   useEffect(() => {
-    console.log('[APP] Inicializando localStorage skip_login');
     if (skipLoginMode) {
       safeStorage.setItem('elton_garage_skip_login', 'true');
     } else {
       safeStorage.removeItem('elton_garage_skip_login');
     }
   }, []);
-
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } }
-  });
-
-  console.log('[APP] Renderizando QueryClientProvider');
 
   return (
     <QueryClientProvider client={queryClient}>
