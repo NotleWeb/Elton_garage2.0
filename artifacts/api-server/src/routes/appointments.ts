@@ -356,9 +356,36 @@ async function calculateAppointmentPrice(serviceIds: any[] = [], discount?: any)
   return Math.max(0, total - discountValue);
 }
 
+async function claimRevenueProcessing(appointmentId: number): Promise<boolean> {
+  const aptRef = db.collection("appointments").doc(String(appointmentId));
+
+  return db.runTransaction(async (t) => {
+    const snap = await t.get(aptRef);
+    if (!snap.exists) return false;
+    const data = snap.data() as any;
+    if (data?.revenue_processed) return false;
+
+    t.update(aptRef, {
+      revenue_processed: true,
+      updated_at: nowIso(),
+    });
+    return true;
+  });
+}
+
 async function handleAppointmentCompletion(id: number, paymentMethod?: string | null) {
   const updated = await getById("appointments", id) as any;
   if (!updated) return;
+
+  // Idempotency guard for legacy/race scenarios: if a revenue tx for this
+  // appointment already exists, skip side effects.
+  const existingRevenue = await db
+    .collection("financial_transactions")
+    .where("appointment_id", "==", id)
+    .where("type", "==", "receita")
+    .limit(1)
+    .get();
+  if (!existingRevenue.empty) return;
 
   const aptSvcSnap = await db.collection("appointment_services").where("appointment_id", "==", id).get();
   const svcIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
@@ -466,10 +493,19 @@ router.patch("/:id/status", async (req, res) => {
   const prevStatus = apt.status;
   await updateDocById("appointments", id, { status, updated_at: nowIso() });
 
-  // Process revenue only once, when transitioning TO "concluido"
-  if (status === "concluido" && !apt.revenue_processed) {
-    await handleAppointmentCompletion(id, null);
-    await updateDocById("appointments", id, { revenue_processed: true });
+  // Process completion side effects only once with transactional claim.
+  if (status === "concluido") {
+    const claimed = await claimRevenueProcessing(id);
+    if (claimed) {
+      try {
+        await handleAppointmentCompletion(id, null);
+      } catch (err) {
+        await updateDocById("appointments", id, { revenue_processed: false, updated_at: nowIso() });
+        logger.error({ err, appointmentId: id }, "Failed to process appointment completion");
+        res.status(500).json({ error: "internal_error", message: "Falha ao concluir servico" });
+        return;
+      }
+    }
   }
 
   res.json(await loadAppointmentDetail(await getById("appointments", id)));
@@ -538,10 +574,19 @@ router.put("/:id", async (req, res) => {
     await batch.commit();
   }
 
-  // Process revenue only if changing TO concluido and not already processed
-  if (newStatus === "concluido" && !apt.revenue_processed) {
-    await handleAppointmentCompletion(id, paymentMethod ?? null);
-    await updateDocById("appointments", id, { revenue_processed: true });
+  // Process completion side effects only once with transactional claim.
+  if (newStatus === "concluido") {
+    const claimed = await claimRevenueProcessing(id);
+    if (claimed) {
+      try {
+        await handleAppointmentCompletion(id, paymentMethod ?? null);
+      } catch (err) {
+        await updateDocById("appointments", id, { revenue_processed: false, updated_at: nowIso() });
+        logger.error({ err, appointmentId: id }, "Failed to process appointment completion");
+        res.status(500).json({ error: "internal_error", message: "Falha ao concluir servico" });
+        return;
+      }
+    }
   }
 
   res.json(await loadAppointmentDetail(await getById("appointments", id)));
