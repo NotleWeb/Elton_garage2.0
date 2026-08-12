@@ -166,6 +166,8 @@ export default function Agendamentos() {
     dateTo: monthEnd,
   });
 
+  const totalAppointments = data?.meta?.total ?? data?.data.length ?? 0;
+
   const { data: customers } = useListCustomers({ limit: 100 });
   const { data: services } = useListServices({ limit: 100, active: true });
   const { data: vehiclesResponse } = useListCustomerVehicles(selectedCustomerId || 0, { query: { enabled: !!selectedCustomerId } as any });
@@ -269,7 +271,12 @@ export default function Agendamentos() {
   return (
     <div className="page-shell">
       <div className="page-header">
-        <h1 className="page-title">Agendamentos</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="page-title">Agendamentos</h1>
+          <Badge variant="secondary" className="rounded-full px-3 py-1 text-sm font-medium">
+            {totalAppointments} {totalAppointments === 1 ? 'agendamento' : 'agendamentos'}
+          </Badge>
+        </div>
 
         <div className="page-actions gap-3">
           <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">

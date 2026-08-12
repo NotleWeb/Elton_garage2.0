@@ -34,6 +34,14 @@ const transactionSchema = z.object({
 
 type TransactionForm = z.infer<typeof transactionSchema>;
 
+function getLocalDateInputValue(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export default function Financeiro() {
   const currentDate = new Date();
   const [page, setPage] = useState(1);
@@ -80,7 +88,7 @@ export default function Financeiro() {
   const form = useForm<TransactionForm>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
-      type: 'despesa', category: 'Geral', description: '', amount: 0, date: new Date().toISOString().split('T')[0], paymentMethod: undefined
+      type: 'despesa', category: 'Geral', description: '', amount: 0, date: getLocalDateInputValue(), paymentMethod: undefined
     }
   });
 
@@ -114,9 +122,7 @@ export default function Financeiro() {
   };
 
   const onSubmit = (values: TransactionForm) => {
-    let dateStr = values.date;
-    if (dateStr.length === 10) dateStr += 'T12:00:00.000Z';
-    else if (!dateStr.endsWith('Z')) dateStr = new Date(dateStr).toISOString();
+    const dateStr = String(values.date).slice(0, 10);
 
     if (editingId) {
       updateMutation.mutate({ id: editingId, data: { ...values, date: dateStr } }, {
@@ -159,7 +165,7 @@ export default function Financeiro() {
             setEditingId(null); 
             form.reset({ 
               type: 'despesa', category: 'Geral', description: '', amount: 0, 
-              date: new Date().toISOString().split('T')[0], paymentMethod: undefined 
+              date: getLocalDateInputValue(), paymentMethod: undefined 
             }); 
           }
         }}>
