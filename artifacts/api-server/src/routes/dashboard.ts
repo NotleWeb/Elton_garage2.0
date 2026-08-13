@@ -1,9 +1,18 @@
 import { Router } from "express";
 import { db, getAll } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getAppointmentBusinessDate } from "../services/appointment-revenue.js";
 
 const router = Router();
 router.use(authMiddleware);
+
+function getTransactionBusinessDate(transaction: any, appointmentDates: Map<number, string>): string {
+  if (transaction.type === "receita" && transaction.appointment_id) {
+    const appointmentDate = appointmentDates.get(Number(transaction.appointment_id));
+    if (appointmentDate) return getAppointmentBusinessDate(appointmentDate);
+  }
+  return (transaction.date ?? "").slice(0, 10);
+}
 
 // GET /dashboard/kpis
 router.get("/kpis", async (req, res) => {
@@ -28,10 +37,13 @@ router.get("/kpis", async (req, res) => {
 
   const apts = appointments as any[];
   const txs = transactions as any[];
-  const monthTxs = txs.filter((t) => (t.date ?? "").startsWith(ym));
+  const appointmentDates = new Map(
+    apts.map((appointment) => [Number(appointment.id), appointment.appointment_date]),
+  );
+  const monthTxs = txs.filter((t) => getTransactionBusinessDate(t, appointmentDates).startsWith(ym));
   const revenueMonth = monthTxs.filter((t) => t.type === "receita").reduce((s, t) => s + Number(t.amount), 0);
   const expensesMonth = monthTxs.filter((t) => t.type === "despesa").reduce((s, t) => s + Number(t.amount), 0);
-  const prevMonthTxs = txs.filter((t) => (t.date ?? "").startsWith(prevYm));
+  const prevMonthTxs = txs.filter((t) => getTransactionBusinessDate(t, appointmentDates).startsWith(prevYm));
   const prevRevenue = prevMonthTxs.filter((t) => t.type === "receita").reduce((s, t) => s + Number(t.amount), 0);
 
   const monthApts = apts.filter((a) => (a.appointment_date ?? "").startsWith(ym));
@@ -71,14 +83,20 @@ router.get("/revenue-by-day", async (req, res) => {
   const month = Number.isFinite(monthParam) && monthParam >= 1 && monthParam <= 12 ? monthParam : now.getMonth() + 1;
   const ym = `${year.toString().padStart(4, "0")}-${String(month).padStart(2, "0")}`;
 
-  const txs = await getAll("financial_transactions") as any[];
-  const monthTxs = txs.filter((t) => (t.date ?? "").startsWith(ym));
+  const [txs, appointments] = await Promise.all([
+    getAll("financial_transactions"),
+    getAll("appointments"),
+  ]) as [any[], any[]];
+  const appointmentDates = new Map(
+    appointments.map((appointment) => [Number(appointment.id), appointment.appointment_date]),
+  );
+  const monthTxs = txs.filter((t) => getTransactionBusinessDate(t, appointmentDates).startsWith(ym));
   const daysInMonth = new Date(year, month, 0).getDate();
   const dailyMap: Record<string, number> = {};
 
   for (const t of monthTxs) {
     if (t.type !== "receita") continue;
-    const date = (t.date ?? "").slice(0, 10);
+    const date = getTransactionBusinessDate(t, appointmentDates);
     dailyMap[date] = (dailyMap[date] ?? 0) + Number(t.amount);
   }
 
