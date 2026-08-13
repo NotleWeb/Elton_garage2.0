@@ -5,7 +5,7 @@ import {
   useGetOrderService, useCreateOrderService, useUpdateOrderService,
   useListProductUsage, useCreateProductUsage, useDeleteProductUsage,
   getGetAppointmentQueryKey, getGetOrderServiceQueryKey, getListProductUsageQueryKey,
-  useListProducts
+  useListProducts, getListTransactionsQueryKey
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -88,6 +88,7 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
     mutation.mutate(payload as any, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetOrderServiceQueryKey(id) });
+        queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
         toast({ title: 'Ordem de serviço salva com sucesso!' });
       },
       onError: () => toast({ title: 'Erro ao salvar O.S.', variant: 'destructive' })

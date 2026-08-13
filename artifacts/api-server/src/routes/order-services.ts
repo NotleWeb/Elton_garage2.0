@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, getById, createDoc, updateDocById, nowIso } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { ensureAppointmentRevenueTransaction } from "../services/appointment-revenue.js";
 
 const router = Router({ mergeParams: true });
 router.use(authMiddleware);
@@ -46,6 +47,7 @@ router.post("/", async (req, res) => {
     payment_method: paymentMethod ?? null, technician: technician ?? null,
     signature: signature ?? null, created_at: nowIso(), updated_at: nowIso(),
   });
+  await ensureAppointmentRevenueTransaction(aptId, paymentMethod);
   res.status(201).json(mapOs(os));
 });
 
@@ -68,6 +70,7 @@ router.put("/", async (req, res) => {
     updated_at: nowIso(),
   });
   const updated = await getById("order_services", osId);
+  await ensureAppointmentRevenueTransaction(aptId, paymentMethod);
   res.json(mapOs(updated));
 });
 
