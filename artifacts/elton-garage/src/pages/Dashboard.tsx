@@ -5,7 +5,7 @@ import {
   useGetUpcomingAppointments,
   useGetCustomersNeedingService
 } from '@workspace/api-client-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -137,7 +137,7 @@ export default function Dashboard() {
                     fontSize={12} 
                     tickLine={false} 
                     axisLine={false}
-                    tickFormatter={(value) => format(new Date(value), 'dd/MM')}
+                    tickFormatter={(value) => formatDate(value, 'dd/MM')}
                   />
                   <YAxis
                     stroke="#888888"
@@ -150,7 +150,7 @@ export default function Dashboard() {
                     contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
                     itemStyle={{ color: '#fafafa' }}
                     formatter={(value: number) => [formatCurrency(value), 'Receita']}
-                    labelFormatter={(label) => format(new Date(label), 'dd/MM/yyyy')}
+                    labelFormatter={(label) => formatDate(label, 'dd/MM/yyyy')}
                   />
                   <Bar dataKey="revenue" fill="currentColor" radius={[4, 4, 0, 0]} className="fill-primary" />
                 </BarChart>
