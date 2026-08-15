@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso, nextId } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { scheduleAppointmentReminder, scheduleFollowUpReminders } from "../services/notification.service.js";
-import { getAppointmentBusinessDate } from "../services/appointment-revenue.js";
+import { getBusinessDate } from "../services/appointment-revenue.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -392,7 +392,7 @@ async function handleAppointmentCompletion(id: number, paymentMethod?: string | 
   const svcIds = aptSvcSnap.docs.map((d) => (d.data() as any).service_id as number);
   const computedPrice = await calculateAppointmentPrice(svcIds, updated.discount);
   const price = Number(updated.final_price ?? 0) || computedPrice;
-  const dateStr = getAppointmentBusinessDate(updated.appointment_date);
+  const dateStr = getBusinessDate(nowIso());
 
   const [customer, services] = await Promise.all([
     getById("customers", updated.customer_id),

@@ -1,12 +1,12 @@
 import { db, getById, nextId, nowIso } from "../db.js";
 
-export function getAppointmentBusinessDate(appointmentDate: string): string {
+export function getBusinessDate(date: string | Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: process.env.BUSINESS_TIMEZONE || "America/Sao_Paulo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(new Date(appointmentDate));
+  }).formatToParts(new Date(date));
   const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
@@ -49,7 +49,7 @@ export async function ensureAppointmentRevenueTransaction(
     category: "Servicos",
     description: `${serviceNames} - ${customer?.name ?? ""}`,
     amount,
-    date: getAppointmentBusinessDate(appointment.appointment_date),
+    date: getBusinessDate(nowIso()),
     appointment_id: appointmentId,
     payment_method: paymentMethod ?? null,
     created_at: nowIso(),
