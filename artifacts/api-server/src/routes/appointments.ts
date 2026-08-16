@@ -378,6 +378,8 @@ async function handleAppointmentCompletion(id: number, paymentMethod?: string | 
   const updated = await getById("appointments", id) as any;
   if (!updated) return;
 
+  await ensureLoyaltyWash(id, updated);
+
   // Idempotency guard for legacy/race scenarios: if a revenue tx for this
   // appointment already exists, skip side effects.
   const existingRevenue = await db
@@ -425,28 +427,6 @@ async function handleAppointmentCompletion(id: number, paymentMethod?: string | 
     }
   });
 
-  const isWash = validSvcs.some((s: any) => s?.category === "Lavagem");
-  if (isWash && customer) {
-    const lSnap = await db.collection("loyalty_cards").where("customer_id", "==", updated.customer_id).limit(1).get();
-    if (lSnap.empty) {
-      await createDoc("loyalty_cards", {
-        customer_id: updated.customer_id, total_washes: 1, current_stamp_count: 1,
-        free_washes_earned: 0, free_washes_used: 0, updated_at: nowIso(),
-      });
-    } else {
-      const l = { id: Number(lSnap.docs[0].id), ...lSnap.docs[0].data() } as any;
-      const newTotal = l.total_washes + 1;
-      const newStamp = (l.current_stamp_count + 1) % 10;
-      const newEarned = Math.floor(newTotal / 10);
-      await updateDocById("loyalty_cards", l.id, {
-        total_washes: newTotal,
-        current_stamp_count: newStamp,
-        free_washes_earned: Math.max(newEarned, l.free_washes_earned),
-        updated_at: nowIso(),
-      });
-    }
-  }
-
   await createDoc("notifications", {
     customer_id: updated.customer_id,
     appointment_id: id,
@@ -469,6 +449,39 @@ async function handleAppointmentCompletion(id: number, paymentMethod?: string | 
     customerName: custName,
     completionDate: nowIso(),
   }).catch((err) => logger.error({ err }, "Failed to schedule follow-up reminders"));
+}
+
+async function ensureLoyaltyWash(id: number, appointment: any): Promise<void> {
+  const isAlreadyProcessed = await db.runTransaction(async (transaction) => {
+    const appointmentRef = db.collection("appointments").doc(String(id));
+    const snapshot = await transaction.get(appointmentRef);
+    if ((snapshot.data() as any)?.loyalty_wash_processed) return true;
+    transaction.update(appointmentRef, { loyalty_wash_processed: true, updated_at: nowIso() });
+    return false;
+  });
+  if (isAlreadyProcessed) return;
+
+  const serviceLinks = await db.collection("appointment_services").where("appointment_id", "==", id).get();
+  const services = await Promise.all(serviceLinks.docs.map((doc) => getById("services", Number((doc.data() as any).service_id))));
+  if (!(services as any[]).some((service) => String(service?.category ?? "").toLowerCase().includes("lavagem"))) return;
+
+  const loyaltySnapshot = await db.collection("loyalty_cards").where("customer_id", "==", appointment.customer_id).limit(1).get();
+  if (loyaltySnapshot.empty) {
+    await createDoc("loyalty_cards", {
+      customer_id: appointment.customer_id, total_washes: 1, current_stamp_count: 1,
+      free_washes_earned: 0, free_washes_used: 0, updated_at: nowIso(),
+    });
+    return;
+  }
+  const card = loyaltySnapshot.docs[0];
+  const data = card.data() as any;
+  const totalWashes = Number(data.total_washes ?? 0) + 1;
+  await card.ref.update({
+    total_washes: totalWashes,
+    current_stamp_count: totalWashes % 10,
+    free_washes_earned: Math.max(Math.floor(totalWashes / 10), Number(data.free_washes_used ?? 0)),
+    updated_at: nowIso(),
+  });
 }
 
 // ── PATCH /appointments/:id/status ─────────────────────────────────────────────
