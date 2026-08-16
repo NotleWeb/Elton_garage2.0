@@ -112,6 +112,52 @@ export async function initDb(): Promise<void> {
   if ((process.env["RUN_DATA_SECURITY_MIGRATION"] ?? "false").toLowerCase() === "true") {
     await migrateSensitiveData();
   }
+
+  await reconcileLoyaltyCards();
+}
+
+async function reconcileLoyaltyCards(): Promise<void> {
+  const [appointmentsSnap, linksSnap, servicesSnap, cardsSnap] = await Promise.all([
+    db.collection("appointments").where("status", "==", "concluido").get(),
+    db.collection("appointment_services").get(),
+    db.collection("services").get(),
+    db.collection("loyalty_cards").get(),
+  ]);
+  const serviceCategory = new Map(
+    servicesSnap.docs.map((doc) => [Number(doc.id), String((doc.data() as any).category ?? "").toLowerCase()]),
+  );
+  const serviceIdsByAppointment = new Map<number, number[]>();
+  for (const link of linksSnap.docs) {
+    const data = link.data() as any;
+    const appointmentId = Number(data.appointment_id);
+    const serviceIds = serviceIdsByAppointment.get(appointmentId) ?? [];
+    serviceIds.push(Number(data.service_id));
+    serviceIdsByAppointment.set(appointmentId, serviceIds);
+  }
+  const washesByCustomer = new Map<number, number>();
+  for (const appointment of appointmentsSnap.docs) {
+    const data = appointment.data() as any;
+    const serviceIds = serviceIdsByAppointment.get(Number(appointment.id)) ?? [];
+    const isWash = serviceIds.some((serviceId) => serviceCategory.get(serviceId)?.includes("lavagem"));
+    if (isWash) {
+      const customerId = Number(data.customer_id);
+      washesByCustomer.set(customerId, (washesByCustomer.get(customerId) ?? 0) + 1);
+    }
+  }
+
+  const batch = db.batch();
+  for (const card of cardsSnap.docs) {
+    const data = card.data() as any;
+    const totalWashes = washesByCustomer.get(Number(data.customer_id)) ?? 0;
+    const freeWashesEarned = Math.floor(totalWashes / 10);
+    batch.update(card.ref, {
+      total_washes: totalWashes,
+      current_stamp_count: totalWashes % 10,
+      free_washes_earned: Math.max(freeWashesEarned, Number(data.free_washes_used ?? 0)),
+      updated_at: nowIso(),
+    });
+  }
+  if (cardsSnap.size > 0) await batch.commit();
 }
 
 async function migrateSensitiveData(): Promise<void> {
