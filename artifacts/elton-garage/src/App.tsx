@@ -9,6 +9,12 @@ import { useEffect } from 'react';
 import { setBaseUrl } from '@workspace/api-client-react';
 import { safeStorage } from '@/lib/safe-storage';
 
+// ---------------------------------------------------------------------------
+// Aplicação principal do frontend
+// ---------------------------------------------------------------------------
+// Este arquivo organiza a navegação, a autenticação e o layout do sistema.
+// Ele define as rotas da aplicação e decide quando exibir login ou painel.
+
 // Aponta o cliente para a URL da API configurada via variável de ambiente.
 // Em produção (Netlify): defina VITE_API_URL no painel do Netlify.
 // Ex: https://seu-app.replit.app
@@ -41,7 +47,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
 
-// Redirect component — calls navigate inside a component body (hook-safe)
+// Componente auxiliar que redireciona para outra rota sem quebrar as regras do hook.
 function Redirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
   useEffect(() => { setLocation(to); }, [to, setLocation]);
@@ -51,7 +57,7 @@ function Redirect({ to }: { to: string }) {
 function AppRouter() {
   const { token, isLoading } = useAuth();
 
-  // Debug route always available - check before auth logic
+  // A rota de debug fica disponível independentemente do estado de autenticação.
   return (
     <>
       <Switch>
@@ -127,6 +133,7 @@ function AppRouter() {
 }
 
 function App() {
+  // Em modo de desenvolvimento, o sistema pode ignorar o login para testes rápidos.
   useEffect(() => {
     if (skipLoginMode) {
       safeStorage.setItem('elton_garage_skip_login', 'true');

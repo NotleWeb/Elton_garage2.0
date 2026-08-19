@@ -5,6 +5,13 @@ import { SECURED_COLLECTIONS, secureDataForRead, secureDataForWrite } from "./li
 import { readFileSync } from "node:fs";
 
 // ---------------------------------------------------------------------------
+// Camada de acesso ao banco de dados
+// ---------------------------------------------------------------------------
+// Este módulo centraliza todas as operações com o Firestore.
+// Ele abstrai a criação, atualização, leitura e exclusão de documentos,
+// além de aplicar regras de segurança e inicialização de dados base.
+
+// ---------------------------------------------------------------------------
 // Firebase Admin init
 // ---------------------------------------------------------------------------
 
@@ -24,8 +31,10 @@ if (!getApps().length) {
 export const db = getFirestore();
 
 // ---------------------------------------------------------------------------
-// Core helpers
+// Helpers principais
 // ---------------------------------------------------------------------------
+// Funções utilitárias que padronizam a criação de registros, o uso de IDs,
+// a leitura segura e a escrita com mascaramento de dados sensíveis.
 
 export function nowIso(): string {
   return new Date().toISOString();

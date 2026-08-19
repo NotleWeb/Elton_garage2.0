@@ -5,6 +5,13 @@ import { scheduleAppointmentReminder, scheduleFollowUpReminders } from "../servi
 import { getBusinessDate } from "../services/appointment-revenue.js";
 import { logger } from "../lib/logger.js";
 
+// ---------------------------------------------------------------------------
+// Gestão de agendamentos
+// ---------------------------------------------------------------------------
+// Este módulo controla toda a lógica de agendamento do negócio:
+// criação, validação de conflito, mudança de status, cálculo de duração,
+// associação de serviços e emissão de lembretes automáticos.
+
 const router = Router();
 router.use(authMiddleware);
 

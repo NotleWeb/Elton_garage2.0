@@ -3,6 +3,13 @@ import { scheduleFollowUpReminders, scheduleAppointmentReminder } from "./notifi
 import { logger } from "../lib/logger.js";
 
 // ---------------------------------------------------------------------------
+// Agendador de lembretes e follow-up
+// ---------------------------------------------------------------------------
+// O sistema gera notificações automaticamente com base em agendamentos
+// concluídos e próximos. Esse serviço evita duplicidade e mantém o fluxo
+// de comunicação operacional ativo sem intervenção manual.
+
+// ---------------------------------------------------------------------------
 // Follow-up generator — for each completed appointment, ensure follow-ups
 // exist. scheduleFollowUpReminders is idempotent per appointment+subtype.
 // ---------------------------------------------------------------------------

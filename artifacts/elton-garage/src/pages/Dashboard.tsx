@@ -17,6 +17,13 @@ import {
   Car, PackageX, Loader2
 } from 'lucide-react';
 
+// ---------------------------------------------------------------------------
+// Tela de dashboard
+// ---------------------------------------------------------------------------
+// Esta página consolida os indicadores mais importantes do negócio:
+// faturamento, lucros, agendamentos, clientes e serviços em destaque.
+// O objetivo é oferecer uma visão executiva em tempo real para a gestão.
+
 export default function Dashboard() {
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth() + 1;

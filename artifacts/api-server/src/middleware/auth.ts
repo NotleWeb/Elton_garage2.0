@@ -1,6 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
+// ---------------------------------------------------------------------------
+// Autenticação via JWT
+// ---------------------------------------------------------------------------
+// Este middleware valida o token enviado no cabeçalho Authorization.
+// Em seguida, anexa o identificador e a role do usuário à requisição,
+// permitindo que rotas protegidas verifiquem permissões e identidade.
+
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET environment variable is required but not set");
 }

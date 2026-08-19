@@ -7,7 +7,7 @@ import {
   getGetDashboardKpisQueryKey, useDeleteAppointment
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatCurrency, formatDateTime, cn } from '@/lib/utils';
+import { formatCurrency, formatAppointmentDateTime, formatTime, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -764,7 +764,7 @@ export default function Agendamentos() {
                   <div key={apt.id} className="rounded-3xl border border-border bg-secondary/10 p-4 shadow-sm transition-colors hover:bg-secondary/20 group">
                     <div className="grid gap-3 md:grid-cols-12 md:items-center">
                       <div className="md:col-span-3 space-y-1">
-                        <div className="text-sm font-semibold text-foreground">{formatDateTime(apt.appointmentDate)}</div>
+                        <div className="text-sm font-semibold text-foreground">{formatAppointmentDateTime(apt.appointmentDate)}</div>
                         <div className="text-xs text-muted-foreground">{apt.customer?.name || '-'} • {cleanVehicleText(apt.vehicle?.brand)} {cleanVehicleText(apt.vehicle?.model)} {displayPlate(apt.vehicle?.plate)}</div>
                       </div>
                       <div className="md:col-span-3">
@@ -786,7 +786,7 @@ export default function Agendamentos() {
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2 md:justify-end">
                       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span>{formatDateTime(apt.appointmentDate).split(' ')[1]}</span>
+                        <span>{formatTime(apt.appointmentDate)}</span>
                         <span>•</span>
                         <span>{displayPlate(apt.vehicle?.plate)}</span>
                       </div>

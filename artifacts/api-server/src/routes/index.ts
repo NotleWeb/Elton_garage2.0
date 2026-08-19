@@ -18,6 +18,12 @@ import dashboardRouter from "./dashboard.js";
 import reportsRouter from "./reports.js";
 import backupRouter from "./backup.js";
 
+// ---------------------------------------------------------------------------
+// Centralização dos endpoints da API
+// ---------------------------------------------------------------------------
+// Este arquivo organiza a aplicação em módulos por domínio do negócio,
+// como autenticação, clientes, veículos, agendamentos, financeiro e relatórios.
+
 const router = Router();
 
 router.use("/", healthRouter);
