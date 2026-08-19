@@ -7,15 +7,25 @@ import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 
+// ---------------------------------------------------------------------------
+// Configuração principal da API
+// ---------------------------------------------------------------------------
+// Este arquivo monta a aplicação Express, define regras de segurança,
+// configura CORS, rate limiting e registra todas as rotas do sistema.
+// Ele atua como o ponto de entrada da camada de backend do sistema.
+
 const app: Express = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
+// Lista de domínios permitidos para acessar a API.
+// Em produção, esta configuração restringe acessos externos e reduz riscos.
 const allowedOrigins = (process.env["ALLOWED_ORIGINS"] ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 
+// Política de CORS: aceita apenas origens autorizadas quando configuradas.
 const corsOrigin = allowedOrigins.length > 0
   ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin || allowedOrigins.includes(origin)) {
@@ -26,6 +36,7 @@ const corsOrigin = allowedOrigins.length > 0
     }
   : true;
 
+// Limite global para evitar abuso e ataques de força bruta na API.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 500,
@@ -33,6 +44,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Limite específico para login e autenticação, para reduzir tentativas repetidas.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -41,6 +53,7 @@ const authLimiter = rateLimit({
   message: { error: "rate_limit", message: "Muitas tentativas. Tente novamente em alguns minutos." },
 });
 
+// Middleware de logging: registra requisições HTTP com identificação única.
 app.use(
   pinoHttp({
     logger,
@@ -51,6 +64,7 @@ app.use(
   }),
 );
 
+// Helmet reforça cabeçalhos HTTP e reduz vulnerabilidades web comuns.
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -79,6 +93,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(apiLimiter);
 app.use("/api/auth", authLimiter);
 
+// Garante que a aplicação só aceite conexões HTTPS em produção.
 app.use((req, res, next) => {
   const isProd = process.env["NODE_ENV"] === "production";
   const forwardedProto = req.headers["x-forwarded-proto"];
@@ -91,8 +106,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// Roteador principal da aplicação. Todas as rotas da API são agrupadas aqui.
 app.use("/api", router);
 
+// Middleware final para padronizar erros internos e retornar respostas úteis.
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (err.message?.includes("CORS")) {
     res.status(403).json({ error: "forbidden", message: "Origem nao permitida" });

@@ -30,3 +30,13 @@ export function formatDateTime(date: string | Date) {
   if (!date) return '';
   return format(toSafeDate(date), 'dd/MM/yyyy HH:mm', { locale: ptBR })
 }
+
+export function formatAppointmentDateTime(date: string | Date) {
+  if (!date) return '';
+  return format(toSafeDate(date), "dd/MM/yyyy - EEEE HH:mm", { locale: ptBR })
+}
+
+export function formatTime(date: string | Date) {
+  if (!date) return '';
+  return format(toSafeDate(date), 'HH:mm', { locale: ptBR })
+}

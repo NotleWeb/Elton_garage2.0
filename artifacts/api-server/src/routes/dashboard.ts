@@ -3,6 +3,12 @@ import { db, getAll } from "../db.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getBusinessDate } from "../services/appointment-revenue.js";
 
+// ---------------------------------------------------------------------------
+// Dashboard e indicadores do negócio
+// ---------------------------------------------------------------------------
+// Este módulo montará os dados usados na tela inicial do sistema,
+// incluindo receita, agendamentos, serviços mais utilizados e clientes que precisam de retorno.
+
 const router = Router();
 router.use(authMiddleware);
 

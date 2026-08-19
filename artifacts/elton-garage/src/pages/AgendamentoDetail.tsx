@@ -8,7 +8,7 @@ import {
   useListProducts, getListTransactionsQueryKey
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatAppointmentDateTime } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -134,7 +134,7 @@ export default function AgendamentoDetail({ params }: { params: { id: string } }
         </Button>
         <div>
           <h1 className="page-title">O.S. #{appointment.id}</h1>
-          <p className="text-muted-foreground">{formatDateTime(appointment.appointmentDate)}</p>
+          <p className="text-muted-foreground">{formatAppointmentDateTime(appointment.appointmentDate)}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           {appointment.status === 'cancelado' ? (

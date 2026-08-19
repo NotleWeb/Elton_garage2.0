@@ -1,6 +1,13 @@
 import { db, createDoc, nowIso, updateDocById } from "../db.js";
 
 // ---------------------------------------------------------------------------
+// Serviço de notificações do sistema
+// ---------------------------------------------------------------------------
+// Este módulo é responsável por criar, deduplicar e programar lembretes
+// relacionados a agendamentos, feedbacks e manutenção preventiva.
+// Ele atua como central de comunicação entre o negócio e o cliente.
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 

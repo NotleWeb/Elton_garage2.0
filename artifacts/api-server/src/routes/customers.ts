@@ -3,6 +3,12 @@ import { db, getAll, getById, createDoc, updateDocById, deleteDocById, nowIso } 
 import { authMiddleware } from "../middleware/auth.js";
 import { secureDataForRead } from "../lib/data-security.js";
 
+// ---------------------------------------------------------------------------
+// Gestão de clientes
+// ---------------------------------------------------------------------------
+// Este módulo cuida do cadastro, listagem, detalhamento e remoção de clientes.
+// Também expõe dados relacionados a veículos, fidelidade e histórico de atendimentos.
+
 const router = Router();
 router.use(authMiddleware);
 

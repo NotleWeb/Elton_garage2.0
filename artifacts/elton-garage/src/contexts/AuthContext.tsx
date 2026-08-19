@@ -3,6 +3,12 @@ import { useLocation } from 'wouter';
 import { User, getMe } from '@workspace/api-client-react';
 import { safeStorage } from '@/lib/safe-storage';
 
+// ---------------------------------------------------------------------------
+// Contexto de autenticação
+// ---------------------------------------------------------------------------
+// Este contexto centraliza o estado do usuário autenticado no frontend,
+// guardando o token e validando a sessão com o backend ao iniciar a aplicação.
+
 interface AuthContextType {
   user: User | null;
   token: string | null;

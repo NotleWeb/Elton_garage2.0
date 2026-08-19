@@ -6,6 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+// ---------------------------------------------------------------------------
+// Layout principal da aplicação
+// ---------------------------------------------------------------------------
+// Define a estrutura visual da interface: sidebar, cabeçalho e área central.
+// Também controla a exibição do conteúdo conforme autenticação e responsividade.
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const { token, isLoading } = useAuth();
   const [location] = useLocation();
