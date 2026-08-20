@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { db, getById } from "../db.js";
+import { db, getById, getAll } from "../db.js";
 import { getLookupHash, secureDataForRead } from "../lib/data-security.js";
 
 const router = Router();
@@ -18,7 +18,8 @@ router.post("/login", async (req, res) => {
     res.status(400).json({ error: "validation", message: "Email e senha sao obrigatorios" });
     return;
   }
-  const emailHash = getLookupHash(email);
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const emailHash = getLookupHash(normalizedEmail);
   if (!emailHash) {
     res.status(400).json({ error: "validation", message: "Email invalido" });
     return;
@@ -26,36 +27,43 @@ router.post("/login", async (req, res) => {
 
   let snap = await db.collection("users")
     .where("email_hash", "==", emailHash)
-    .where("active", "==", 1)
     .limit(1)
     .get();
 
   if (snap.empty) {
     // Compatibilidade temporaria para registros antigos sem hash de email.
     snap = await db.collection("users")
-      .where("email", "==", email)
-      .where("active", "==", 1)
+      .where("email", "==", normalizedEmail)
       .limit(1)
       .get();
   }
 
-  if (snap.empty) {
+  let user: any = null;
+  if (!snap.empty) {
+    const doc = snap.docs[0];
+    user = {
+      id: Number(doc.id),
+      ...secureDataForRead("users", doc.data() as Record<string, unknown>),
+    } as any;
+  }
+
+  if (!user) {
+    const users = await getAll("users") as any[];
+    user = users.find((u) => String(u.email ?? "").trim().toLowerCase() === normalizedEmail) ?? null;
+  }
+
+  if (!user || !(user.active === 1 || user.active === true)) {
     res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
     return;
   }
 
-  const doc = snap.docs[0];
-  const user = {
-    id: Number(doc.id),
-    ...secureDataForRead("users", doc.data() as Record<string, unknown>),
-  } as any;
-
-  if (!user || !user.password_hash) {
+  const passwordHash = user.password_hash ?? user.passwordHash;
+  if (!passwordHash) {
     res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
     return;
   }
 
-  const passwordMatches = await bcrypt.compare(password, String(user.password_hash));
+  const passwordMatches = await bcrypt.compare(password, String(passwordHash));
   if (!passwordMatches) {
     res.status(401).json({ error: "auth", message: "Credenciais invalidas" });
     return;
