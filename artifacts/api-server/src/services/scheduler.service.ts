@@ -1,4 +1,4 @@
-import { db, getAll, getById } from "../db.js";
+import { db, getAll, getById, isDbReady } from "../db.js";
 import { scheduleFollowUpReminders, scheduleAppointmentReminder } from "./notification.service.js";
 import { logger } from "../lib/logger.js";
 
@@ -150,12 +150,19 @@ async function runJobs(): Promise<void> {
 }
 
 export function startScheduler(): void {
+  if (!isDbReady()) {
+    logger.warn("Notification scheduler skipped because Firestore is unavailable");
+    return;
+  }
+
   // Defer initial run so the DB has time to fully warm up
   setTimeout(() => {
+    if (!isDbReady()) return;
     runJobs().catch((err) => logger.error({ err }, "Scheduler: initial run failed"));
   }, 5000);
 
   setInterval(() => {
+    if (!isDbReady()) return;
     runJobs().catch((err) => logger.error({ err }, "Scheduler: periodic run failed"));
   }, 60 * 60 * 1000);
 

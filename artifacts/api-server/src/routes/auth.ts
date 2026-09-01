@@ -31,7 +31,7 @@ router.post("/login", async (req, res) => {
     .get();
 
   if (snap.empty) {
-    // Compatibilidade temporaria para registros antigos sem hash de email.
+    // TODO: Remove after 2025-12-01 — Compatibilidade temporária para registros antigos sem hash de email.
     snap = await db.collection("users")
       .where("email", "==", normalizedEmail)
       .limit(1)

@@ -2,6 +2,7 @@ import { initializeApp, cert, applicationDefault, getApps } from "firebase-admin
 import { getFirestore } from "firebase-admin/firestore";
 import bcrypt from "bcryptjs";
 import { SECURED_COLLECTIONS, secureDataForRead, secureDataForWrite } from "./lib/data-security.js";
+import { logger } from "./lib/logger.js";
 import { readFileSync } from "node:fs";
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,11 @@ if (!getApps().length) {
 }
 
 export const db = getFirestore();
+export let dbReady = false;
+
+export function isDbReady(): boolean {
+  return dbReady;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers principais
@@ -98,31 +104,40 @@ export async function deleteDocById(col: string, id: number): Promise<void> {
 // Database initialisation: seed admin user + demo data
 // ---------------------------------------------------------------------------
 
-export async function initDb(): Promise<void> {
-  const adminSnap = await db
-    .collection("users")
-    .where("email", "==", "admin@eltongarage.com")
-    .limit(1)
-    .get();
+export async function initDb(): Promise<boolean> {
+  try {
+    const adminSnap = await db
+      .collection("users")
+      .where("email", "==", "admin@eltongarage.com")
+      .limit(1)
+      .get();
 
-  if (adminSnap.empty) {
-    const hash = bcrypt.hashSync("admin123", 10);
-    await createDoc("users", {
-      name: "Administrador",
-      email: "admin@eltongarage.com",
-      password_hash: hash,
-      role: "admin",
-      active: 1,
-      created_at: nowIso(),
-      updated_at: nowIso(),
-    });
+    if (adminSnap.empty) {
+      const hash = bcrypt.hashSync("admin123", 10);
+      await createDoc("users", {
+        name: "Administrador",
+        email: "admin@eltongarage.com",
+        password_hash: hash,
+        role: "admin",
+        active: 1,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      });
+    }
+
+    if ((process.env["RUN_DATA_SECURITY_MIGRATION"] ?? "false").toLowerCase() === "true") {
+      // TODO: Remove after 2025-12-01 — Data security migration can be permanently removed once all records are migrated
+      await migrateSensitiveData();
+    }
+
+    await reconcileLoyaltyCards();
+    dbReady = true;
+    return true;
+  } catch (err) {
+    dbReady = false;
+    logger.warn({ err }, "Firestore unavailable during startup; continuing in degraded mode");
+    return false;
   }
-
-  if ((process.env["RUN_DATA_SECURITY_MIGRATION"] ?? "false").toLowerCase() === "true") {
-    await migrateSensitiveData();
-  }
-
-  await reconcileLoyaltyCards();
 }
 
 async function reconcileLoyaltyCards(): Promise<void> {
