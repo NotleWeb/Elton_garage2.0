@@ -1,5 +1,3 @@
-- [Multi-service appointments schema](multi-service-appointments.md) — junction table appointment_services replaced service_id; migration via PRAGMA foreign_keys OFF outside any transaction.
-- [PostgreSQL migration patterns](pg-migration-patterns.md) — SQLite→PG conversion patterns for all route files; pg accessible via workspace even without explicit declaration.
 - [Replit file write quirks](replit-file-write-quirks.md) — overwriting tracked git files silently fails; must delete first then write fresh.
-- [Firebase Firestore migration](firebase-migration.md) — full rewrite from PostgreSQL to Firebase Firestore; key patterns, secrets, and deployment requirements.
+- [Firebase Firestore patterns](firebase-migration.md) — current database backend patterns, schemas, and deployment requirements.
 - [Notification system design](notification-system.md) — automated reminders architecture: upsert pattern for follow-ups, deterministic dedup, scheduler strategy.

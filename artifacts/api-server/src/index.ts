@@ -1,5 +1,5 @@
 import app from "./app";
-import { initDb } from "./db";
+import { initDb, isDbReady } from "./db";
 import { startScheduler } from "./services/scheduler.service";
 import { logger } from "./lib/logger";
 
@@ -14,16 +14,22 @@ if (!rawPort) throw new Error("PORT environment variable is required but was not
 const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) throw new Error(`Invalid PORT value: "${rawPort}"`);
 
-// A inicialização do banco garante o usuário administrador padrão e os dados iniciais.
-initDb()
-  .then(() => {
-    app.listen(port, (err?: Error) => {
-      if (err) { logger.error({ err }, "Error listening on port"); process.exit(1); }
-      logger.info({ port }, "Server listening");
+async function startServer(): Promise<void> {
+  const dbInitialized = await initDb();
+
+  app.listen(port, (err?: Error) => {
+    if (err) { logger.error({ err }, "Error listening on port"); process.exit(1); }
+    logger.info({ port }, "Server listening");
+
+    if (dbInitialized && isDbReady()) {
       startScheduler();
-    });
-  })
-  .catch((err) => {
-    logger.error({ err }, "Failed to initialize database");
-    process.exit(1);
+    } else {
+      logger.warn("Server started in degraded mode because Firestore is unavailable");
+    }
   });
+}
+
+startServer().catch((err) => {
+  logger.error({ err }, "Failed to start the server");
+  process.exit(1);
+});

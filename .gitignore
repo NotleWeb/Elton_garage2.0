@@ -41,6 +41,11 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
