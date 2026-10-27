@@ -12,6 +12,9 @@ Variáveis de ambiente necessárias:
 - `FIREBASE_SERVICE_ACCOUNT_JSON`
   - o JSON completo da conta de serviço Firebase
   - deve ser copiado como texto no painel de variáveis do Render
+- `FIREBASE_PROJECT_ID`
+   - ID do projeto Firebase (o valor `project_id` da conta de serviço)
+   - configure no Render para evitar falha na descoberta do projeto; não é uma chave secreta
 - `SESSION_SECRET`
   - string aleatória para assinar tokens/sessões
   - deve estar definida no serviço Render antes de iniciar

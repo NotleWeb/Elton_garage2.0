@@ -1,0 +1,247 @@
+$kind: collection
+scripts:
+  - type: http:beforeRequest
+    code: "{\r
+
+      \  \"info\": {\r
+
+      \    \"_postman_id\": \"ad6cf073-eef4-4fa2-bdde-4887880e7a52\",\r
+
+      \    \"name\": \"Elton Garage - Seguranca e autenticacao (local)\",\r
+
+      \    \"description\": \"Um unico pedido executa todos os testes HTTP de autenticacao usando scripts do Postman. Requer a API local e o Firestore Emulator. Nunca aponte para producao.\",\r
+
+      \    \"schema\": \"https://schema.getpostman.com/json/collection/v2.1.0/collection.json\"\r
+
+      \  },\r
+
+      \  \"variable\": [\r
+
+      \    {\r
+
+      \      \"key\": \"baseUrl\",\r
+
+      \      \"value\": \"http://localhost:3001\"\r
+
+      \    },\r
+
+      \    {\r
+
+      \      \"key\": \"email\",\r
+
+      \      \"value\": \"admin@eltongarage.com\"\r
+
+      \    },\r
+
+      \    {\r
+
+      \      \"key\": \"password\",\r
+
+      \      \"value\": \"admin123\"\r
+
+      \    }\r
+
+      \  ],\r
+
+      \  \"item\": [\r
+
+      \    {\r
+
+      \      \"name\": \"Executar roteiro completo de autenticacao\",\r
+
+      \      \"request\": {\r
+
+      \        \"method\": \"GET\",\r
+
+      \        \"header\": [],\r
+
+      \        \"url\": \"{{baseUrl}}/api/healthz\",\r
+
+      \        \"description\": \"Clique em Send uma vez. O script testa saude, login, identidade autenticada, rota protegida sem token, senha incorreta e logout. O JWT e mantido somente em memoria.\"\r
+
+      \      },\r
+
+      \      \"event\": [\r
+
+      \        {\r
+
+      \          \"listen\": \"test\",\r
+
+      \          \"script\": {\r
+
+      \            \"type\": \"text/javascript\",\r
+
+      \            \"exec\": [\r
+
+      \              \"const baseUrl = (pm.collectionVariables.get('baseUrl') || 'http://localhost:3001').replace(/\\\\/$/, '');\",\r
+
+      \              \"const email = pm.collectionVariables.get('email') || 'admin@eltongarage.com';\",\r
+
+      \              \"const password = pm.collectionVariables.get('password') || 'admin123';\",\r
+
+      \              \"let token = '';\",\r
+
+      \              \"\",\r
+
+      \              \"function parseJson(response) {\",\r
+
+      \              \"  try { return response.json(); } catch (_) { return {}; }\",\r
+
+      \              \"}\",\r
+
+      \              \"\",\r
+
+      \              \"function checkResponse(name, error, response, expectedStatus, validateBody) {\",\r
+
+      \              \"  pm.test(name, function () {\",\r
+
+      \              \"    pm.expect(error, 'erro de conexao').to.equal(null);\",\r
+
+      \              \"    pm.expect(response, 'resposta HTTP ausente').to.exist;\",\r
+
+      \              \"    pm.expect(response.code, 'status HTTP').to.equal(expectedStatus);\",\r
+
+      \              \"    if (validateBody) validateBody(parseJson(response));\",\r
+
+      \              \"  });\",\r
+
+      \              \"}\",\r
+
+      \              \"\",\r
+
+      \              \"const steps = [\",\r
+
+      \              \"  {\",\r
+
+      \              \"    name: 'Login valido retorna HTTP 200 sem expor o JWT nos testes',\",\r
+
+      \              \"    request: function () { return { url: baseUrl + '/api/auth/login', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: JSON.stringify({ email: email, password: password }) } }; },\",\r
+
+      \              \"    status: 200,\",\r
+
+      \              \"    validate: function (body) {\",\r
+
+      \              \"      pm.expect(body.user, 'dados do usuario').to.be.an('object');\",\r
+
+      \              \"      pm.expect(body.user.id, 'id do usuario').to.exist;\",\r
+
+      \              \"      pm.expect(body.user.role, 'perfil do usuario').to.be.a('string').and.not.empty;\",\r
+
+      \              \"      pm.expect(body.token, 'token de acesso').to.be.a('string').and.not.empty;\",\r
+
+      \              \"      token = body.token;\",\r
+
+      \              \"    }\",\r
+
+      \              \"  },\",\r
+
+      \              \"  {\",\r
+
+      \              \"    name: 'Token valido consulta a identidade do usuario (HTTP 200)',\",\r
+
+      \              \"    request: function () { return { url: baseUrl + '/api/auth/me', method: 'GET', header: { Authorization: 'Bearer ' + token } }; },\",\r
+
+      \              \"    status: 200,\",\r
+
+      \              \"    validate: function (body) {\",\r
+
+      \              \"      pm.expect(body.id, 'id autenticado').to.exist;\",\r
+
+      \              \"      pm.expect(body.role, 'perfil autenticado').to.be.a('string').and.not.empty;\",\r
+
+      \              \"    }\",\r
+
+      \              \"  },\",\r
+
+      \              \"  {\",\r
+
+      \              \"    name: 'Rota protegida recusa requisicao sem token (HTTP 401)',\",\r
+
+      \              \"    request: function () { return { url: baseUrl + '/api/customers', method: 'GET' }; },\",\r
+
+      \              \"    status: 401\",\r
+
+      \              \"  },\",\r
+
+      \              \"  {\",\r
+
+      \              \"    name: 'Senha incorreta e recusada com erro generico (HTTP 401)',\",\r
+
+      \              \"    request: function () { return { url: baseUrl + '/api/auth/login', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: JSON.stringify({ email: email, password: 'senha-incorreta-para-teste' }) } }; },\",\r
+
+      \              \"    status: 401,\",\r
+
+      \              \"    validate: function (body) { pm.expect(body.message).to.eql('Credenciais invalidas'); }\",\r
+
+      \              \"  },\",\r
+
+      \              \"  {\",\r
+
+      \              \"    name: 'Logout conclui com HTTP 200',\",\r
+
+      \              \"    request: function () { return { url: baseUrl + '/api/auth/logout', method: 'POST' }; },\",\r
+
+      \              \"    status: 200,\",\r
+
+      \              \"    validate: function (body) { pm.expect(body.message).to.be.a('string').and.not.empty; }\",\r
+
+      \              \"  }\",\r
+
+      \              \"];\",\r
+
+      \              \"\",\r
+
+      \              \"pm.test('API e Firestore Emulator locais estao saudaveis (HTTP 200)', function () {\",\r
+
+      \              \"  pm.response.to.have.status(200);\",\r
+
+      \              \"  pm.expect(parseJson(pm.response).status).to.eql('ok');\",\r
+
+      \              \"});\",\r
+
+      \              \"\",\r
+
+      \              \"function runStep(index) {\",\r
+
+      \              \"  if (index >= steps.length) {\",\r
+
+      \              \"    token = '';\",\r
+
+      \              \"    return;\",\r
+
+      \              \"  }\",\r
+
+      \              \"  const step = steps[index];\",\r
+
+      \              \"  pm.sendRequest(step.request(), function (error, response) {\",\r
+
+      \              \"    checkResponse(step.name, error, response, step.status, step.validate);\",\r
+
+      \              \"    runStep(index + 1);\",\r
+
+      \              \"  });\",\r
+
+      \              \"}\",\r
+
+      \              \"\",\r
+
+      \              \"runStep(0);\"\r
+
+      \            ]\r
+
+      \          }\r
+
+      \        }\r
+
+      \      ]\r
+
+      \    }\r
+
+      \  ]\r
+
+      }\r\n"
+    language: text/javascript
+auth:
+  - id: 8750423e-4b41-4568-8c03-76673cdafacd
+    type: apikey
+    name: API Key

@@ -1,0 +1,85 @@
+$kind: http-request
+order: 1000
+url: '{{baseUrl}}/api/healthz'
+method: GET
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const baseUrl = (pm.collectionVariables.get('baseUrl') || 'http://localhost:3001').replace(/\/$/, '');
+      const email = pm.collectionVariables.get('email') || 'admin@eltongarage.com';
+      const password = pm.collectionVariables.get('password') || 'admin123';
+      let token = '';
+
+      function parseJson(response) {
+        try { return response.json(); } catch (_) { return {}; }
+      }
+
+      function checkResponse(name, error, response, expectedStatus, validateBody) {
+        pm.test(name, function () {
+          pm.expect(error, 'erro de conexao').to.equal(null);
+          pm.expect(response, 'resposta HTTP ausente').to.exist;
+          pm.expect(response.code, 'status HTTP').to.equal(expectedStatus);
+          if (validateBody) validateBody(parseJson(response));
+        });
+      }
+
+      const steps = [
+        {
+          name: 'Login valido retorna HTTP 200 sem expor o JWT nos testes',
+          request: function () { return { url: baseUrl + '/api/auth/login', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: JSON.stringify({ email: email, password: password }) } }; },
+          status: 200,
+          validate: function (body) {
+            pm.expect(body.user, 'dados do usuario').to.be.an('object');
+            pm.expect(body.user.id, 'id do usuario').to.exist;
+            pm.expect(body.user.role, 'perfil do usuario').to.be.a('string').and.not.empty;
+            pm.expect(body.token, 'token de acesso').to.be.a('string').and.not.empty;
+            token = body.token;
+          }
+        },
+        {
+          name: 'Token valido consulta a identidade do usuario (HTTP 200)',
+          request: function () { return { url: baseUrl + '/api/auth/me', method: 'GET', header: { Authorization: 'Bearer ' + token } }; },
+          status: 200,
+          validate: function (body) {
+            pm.expect(body.id, 'id autenticado').to.exist;
+            pm.expect(body.role, 'perfil autenticado').to.be.a('string').and.not.empty;
+          }
+        },
+        {
+          name: 'Rota protegida recusa requisicao sem token (HTTP 401)',
+          request: function () { return { url: baseUrl + '/api/customers', method: 'GET' }; },
+          status: 401
+        },
+        {
+          name: 'Senha incorreta e recusada com erro generico (HTTP 401)',
+          request: function () { return { url: baseUrl + '/api/auth/login', method: 'POST', header: { 'Content-Type': 'application/json' }, body: { mode: 'raw', raw: JSON.stringify({ email: email, password: 'senha-incorreta-para-teste' }) } }; },
+          status: 401,
+          validate: function (body) { pm.expect(body.message).to.eql('Credenciais invalidas'); }
+        },
+        {
+          name: 'Logout conclui com HTTP 200',
+          request: function () { return { url: baseUrl + '/api/auth/logout', method: 'POST' }; },
+          status: 200,
+          validate: function (body) { pm.expect(body.message).to.be.a('string').and.not.empty; }
+        }
+      ];
+
+      pm.test('API e Firestore Emulator locais estao saudaveis (HTTP 200)', function () {
+        pm.response.to.have.status(200);
+        pm.expect(parseJson(pm.response).status).to.eql('ok');
+      });
+
+      function runStep(index) {
+        if (index >= steps.length) {
+          token = '';
+          return;
+        }
+        const step = steps[index];
+        pm.sendRequest(step.request(), function (error, response) {
+          checkResponse(step.name, error, response, step.status, step.validate);
+          runStep(index + 1);
+        });
+      }
+
+      runStep(0);

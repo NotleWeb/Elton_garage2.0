@@ -1,0 +1,9 @@
+# Use this workspace to collaborate
+workspace:
+  id: 8663263f-bd09-4d50-8837-13fde42c8caf
+
+localResources:
+  collections:
+    - ../POSTMAN_SEGURANCA.collection.json
+  specs:
+    - ../lib/api-spec/openapi.yaml

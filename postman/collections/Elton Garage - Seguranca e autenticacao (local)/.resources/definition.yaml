@@ -1,0 +1,10 @@
+$kind: collection
+name: 'Elton Garage - Seguranca e autenticacao (local)'
+description: 'Um unico pedido executa todos os testes HTTP de autenticacao usando scripts do Postman. Requer a API local e o Firestore Emulator. Nunca aponte para producao.'
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3001'
+  - key: email
+    value: 'admin@eltongarage.com'
+  - key: password
+    value: 'admin123'

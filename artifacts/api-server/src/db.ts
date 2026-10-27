@@ -19,14 +19,21 @@ import { readFileSync } from "node:fs";
 if (!getApps().length) {
   const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   const svcPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  const serviceAccount = svcJson
+    ? JSON.parse(svcJson)
+    : svcPath
+      ? JSON.parse(readFileSync(svcPath, "utf8"))
+      : undefined;
+  const projectId =
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.GCLOUD_PROJECT ||
+    serviceAccount?.project_id;
 
-  if (svcJson) {
-    initializeApp({ credential: cert(JSON.parse(svcJson)) });
-  } else if (svcPath) {
-    initializeApp({ credential: cert(JSON.parse(readFileSync(svcPath, "utf8"))) });
-  } else {
-    initializeApp({ credential: applicationDefault() });
-  }
+  initializeApp({
+    credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
+    ...(projectId ? { projectId } : {}),
+  });
 }
 
 export const db = getFirestore();
