@@ -14,7 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Bell, Loader2, CheckCircle2, Calendar, Star, Car, Target,
-  Info, Package, DollarSign, Archive, Trash2, Check, Filter,
+  Info, Package, DollarSign, Archive, Trash2, Check, Filter, MessageCircle,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -88,6 +88,19 @@ function relativeDate(iso: string): string {
   } catch {
     return '';
   }
+}
+
+function getWhatsAppUrl(phone: string | undefined, customerName: string, title: string, message: string): string | null {
+  const digits = phone?.replace(/\D/g, '') ?? '';
+  const localNumber = digits.startsWith('0') ? digits.slice(1) : digits;
+  const internationalNumber = localNumber.length === 10 || localNumber.length === 11
+    ? `55${localNumber}`
+    : localNumber;
+
+  if (internationalNumber.length < 12) return null;
+
+  const text = `Olá, ${customerName}! Tudo bem? Estamos entrando em contato sobre ${title}. ${message}`;
+  return `https://wa.me/${internationalNumber}?text=${encodeURIComponent(text)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +258,11 @@ export default function Notificacoes() {
         ) : (
           data?.data.map((notif) => {
             const meta = getTypeMeta(notif.type);
+            const supportsWhatsApp = ['feedback', 'maintenance', 'return'].includes(notif.type);
+            const customerPhone = notif.customer?.whatsapp || notif.customer?.phone;
+            const whatsAppUrl = supportsWhatsApp && notif.customer
+              ? getWhatsAppUrl(customerPhone, notif.customer.name, notif.title, notif.message)
+              : null;
             return (
               <Card
                 key={notif.id}
@@ -301,6 +319,22 @@ export default function Notificacoes() {
                       <Badge variant="outline" className="mt-2 bg-background text-xs">
                         Cliente: {notif.customer.name}
                       </Badge>
+                    )}
+                    {supportsWhatsApp && notif.customer && (
+                      <div className="mt-3">
+                        {whatsAppUrl ? (
+                          <Button variant="outline" size="sm" className="gap-2" asChild>
+                            <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer">
+                              <MessageCircle className="w-4 h-4 text-green-600" />
+                              Enviar mensagem pelo WhatsApp
+                            </a>
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Cadastre um telefone válido para este cliente para enviar pelo WhatsApp.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
 

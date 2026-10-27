@@ -57,7 +57,8 @@ function validateStatusTransition(currentStatus: string, newStatus: string): { v
 
   // Can only move forward (or stay same)
   if (newIdx < currentIdx) {
-    return { valid: false, error: `Nao e permitido mudar de ${currentStatus} para ${newStatus}. Status deve progredir: agendado → confirmado → em_andamento → concluido` };
+    return { valid: false, error: `Nao e permitido mudar de ${currentStatus} para ${newStatus}.
+     Status deve progredir: agendado → confirmado → em_andamento → concluido` };
   }
 
   return { valid: true };

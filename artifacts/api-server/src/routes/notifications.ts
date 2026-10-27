@@ -14,7 +14,8 @@ function isDue(n: any): boolean {
   return new Date(n.scheduled_for) <= new Date();
 }
 
-function formatNotification(n: any, custMap: Map<number, string>) {
+function formatNotification(n: any, custMap: Map<number, { name: string; phone?: string; whatsapp?: string }>) {
+  const customer = n.customer_id ? custMap.get(n.customer_id) : undefined;
   return {
     id: n.id,
     customerId: n.customer_id,
@@ -30,8 +31,21 @@ function formatNotification(n: any, custMap: Map<number, string>) {
     archived: !!n.archived,
     scheduledFor: n.scheduled_for ?? null,
     createdAt: n.created_at,
-    customer: n.customer_id ? { id: n.customer_id, name: custMap.get(n.customer_id) } : undefined,
+    customer: customer ? { id: n.customer_id, ...customer } : undefined,
   };
+}
+
+function mapCustomers(customers: any[]) {
+  return new Map(
+    customers.map((customer) => [
+      customer.id,
+      {
+        name: customer.name,
+        phone: customer.phone ?? undefined,
+        whatsapp: customer.whatsapp ?? undefined,
+      },
+    ]),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -46,7 +60,7 @@ router.get("/", async (req, res) => {
     getAll("customers"),
   ]);
 
-  const custMap = new Map((customers as any[]).map((c: any) => [c.id, c.name]));
+  const custMap = mapCustomers(customers as any[]);
   const now = new Date();
 
   let filtered = (notifications as any[]).filter((n) => {
@@ -105,7 +119,7 @@ router.get("/:id", async (req, res) => {
   }
 
   const customers = await getAll("customers") as any[];
-  const custMap = new Map(customers.map((c: any) => [c.id, c.name]));
+  const custMap = mapCustomers(customers);
   res.json(formatNotification(n, custMap));
 });
 
@@ -135,7 +149,7 @@ router.patch("/:id/read", async (req, res) => {
     getById("notifications", id),
     getAll("customers"),
   ]) as any[];
-  const custMap = new Map((customers as any[]).map((c: any) => [c.id, c.name]));
+  const custMap = mapCustomers(customers as any[]);
   res.json(formatNotification(updated, custMap));
 });
 
@@ -158,7 +172,7 @@ router.patch("/:id/complete", async (req, res) => {
     getById("notifications", id),
     getAll("customers"),
   ]) as any[];
-  const custMap = new Map((customers as any[]).map((c: any) => [c.id, c.name]));
+  const custMap = mapCustomers(customers as any[]);
   res.json(formatNotification(updated, custMap));
 });
 
