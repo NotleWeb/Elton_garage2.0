@@ -52,3 +52,8 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Firebase CLI artifacts
+.firebase/
+firebase-debug.log
+firestore-debug.log
