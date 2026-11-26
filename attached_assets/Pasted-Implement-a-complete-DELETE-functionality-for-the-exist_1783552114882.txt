@@ -1,0 +1,68 @@
+Implement a complete DELETE functionality for the existing web application.
+
+Before making any changes:
+
+- Analyze the entire project.
+- Identify all dependencies.
+- Detect possible errors or broken references.
+- Resolve any issues that could prevent the DELETE feature from working correctly.
+- Do not break existing functionality.
+
+Implement DELETE support for:
+
+• Appointments (Agendamentos)
+• Customers (Clientes)
+• Services (Serviços)
+• Products (Produtos)
+
+Requirements:
+
+BACKEND
+- Create DELETE endpoints if they do not exist.
+- Validate that the record exists before deleting.
+- Return proper HTTP status codes.
+- Handle exceptions correctly.
+- Prevent server crashes.
+- Remove all related records when appropriate or block deletion with a clear error message if there are dependencies.
+- Keep database integrity.
+
+FRONTEND
+- Add a "Excluir" button on all corresponding pages.
+- Before deleting, display a confirmation modal in Portuguese (Brasil):
+
+"Têm certeza que deseja excluir este registro?
+Esta ação não poderá ser desfeita."
+
+Buttons:
+- Cancelar
+- Excluir
+
+- Show loading state while deleting.
+- Display success notification:
+
+"Registro excluído com sucesso."
+
+- Display friendly error messages in Portuguese if deletion fails.
+
+DATABASE
+- Verify foreign key constraints.
+- Prevent orphan records.
+- Apply cascade delete only where appropriate.
+- Preserve database consistency.
+
+QUALITY
+- Do not remove any existing functionality.
+- Do not change the current UI layout.
+- Reuse existing components whenever possible.
+- Keep code clean and modular.
+- Follow the project's architecture and coding standards.
+
+Before finishing:
+- Verify that all DELETE operations work correctly.
+- Fix any errors found during implementation.
+- Ensure the project builds and runs without errors.
+- Do not leave TODOs or placeholder code.
+- Deliver production-ready code only.
+
+IMPORTANT:
+All user interface texts must remain in Brazilian Portuguese (pt-BR).
